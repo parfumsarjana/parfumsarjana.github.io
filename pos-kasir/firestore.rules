@@ -4,19 +4,19 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
     function role() { return userDoc().data.role; }
-    // Admin = satu-satunya akun Google ini (email harus terverifikasi). Role "admin" di koleksi users TIDAK lagi berlaku.
-    function isAdmin() {
+    // Admin = akun Google pemilik (email terverifikasi) ATAU akun di koleksi users dengan role "admin" yang aktif.
+    function isOwner() {
       return signedIn()
         && request.auth.token.email == 'samdhiwani123@gmail.com'
         && request.auth.token.email_verified == true;
     }
-    // Staff = admin Google, atau akun di koleksi users (bukan role admin lama) yang tidak dinonaktifkan.
+    // Staff = pemilik, atau akun yang terdaftar di koleksi users dan tidak dinonaktifkan.
     function isStaff() {
-      return isAdmin() || (signedIn()
+      return isOwner() || (signedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && userDoc().data.get('active', true) != false
-        && userDoc().data.role != 'admin');
+        && userDoc().data.get('active', true) != false);
     }
+    function isAdmin() { return isOwner() || (isStaff() && role() == 'admin'); }
     // Hak akses role kustom disimpan di meta/roles (map: roleId -> {name, perms}). Admin selalu lolos.
     function can(p) {
       return isAdmin() || (isStaff()

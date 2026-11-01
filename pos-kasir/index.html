@@ -268,9 +268,9 @@ const DEF_BRANCHES = [{ key: "ums", name: "Parfum Sarjana UMS", active: true }, 
 const DEF_ROLES = { kasir: { name: "Kasir", perms: { jual: true, pelanggan: true, laporan: true, riwayat: true } } };
 const DEF_RECEIPT = {
   title: "PARFUM SARJANA", sub: "", footer: "Terima kasih sudah berbelanja di Parfum Sarjana!", paper: "58",
-  showBranch: true, showInvoice: true, showDate: true, showKasir: true, showMember: true, showUnitPrice: true, showDiscount: true, showPayment: true
+  showBranch: true, showAddress: true, showInvoice: true, showDate: true, showKasir: true, showMember: true, showUnitPrice: true, showDiscount: true, showPayment: true
 };
-const RC_TOGGLES = [["showBranch","Nama cabang"],["showInvoice","Nomor invoice"],["showDate","Tanggal & jam"],["showKasir","Nama kasir"],["showMember","Data pelanggan"],["showUnitPrice","Harga satuan per item"],["showDiscount","Baris diskon"],["showPayment","Metode bayar, nominal & kembalian"]];
+const RC_TOGGLES = [["showBranch","Nama cabang"],["showAddress","Alamat cabang"],["showInvoice","Nomor invoice"],["showDate","Tanggal & jam"],["showKasir","Nama kasir"],["showMember","Data pelanggan"],["showUnitPrice","Harga satuan per item"],["showDiscount","Baris diskon"],["showPayment","Metode bayar, nominal & kembalian"]];
 const METHODS = ["Tunai", "QRIS", "Debit", "Transfer"];
 const RANGES = [["hari","Hari ini"],["kemarin","Kemarin"],["7","7 hari"],["30","30 hari"],["bulan","Bulan ini"],["lalu","Bulan lalu"]];
 const LEGACY_BR = { "Parfum Sarjana UMS": "ums", "Parfum Sarjana UNS": "uns" };
@@ -286,7 +286,7 @@ const S = {
   pg: {}, cur: null, imp: null
 };
 const can = p => S.admin || !!(S.me && S.roles[S.me.role] && S.roles[S.me.role].perms && S.roles[S.me.role].perms[p]);
-const roleName = id => id === "admin" ? "Admin lama" : ((S.roles[id] && S.roles[id].name) || id);
+const roleName = id => id === "admin" ? "Admin" : ((S.roles[id] && S.roles[id].name) || id);
 const bkOf = s => s.bk || (S.branches.find(b => b.name === s.branch) || {}).key || LEGACY_BR[s.branch];
 
 const getCol = c => collection(db, c);
@@ -463,9 +463,11 @@ function getRange(k) {
 // ==========================================
 // STRUK (template)
 // ==========================================
+const branchAddr = s => ((S.branches.find(b => (s.bk && b.key === s.bk) || b.name === s.branch) || {}).address || "").trim();
 function receiptHTML(s, t = S.receipt) {
+  const addr = t.showAddress ? branchAddr(s) : "";
   const meta = [
-    t.showBranch && esc(s.branch), t.showInvoice && esc(s.id),
+    t.showBranch && esc(s.branch), addr && esc(addr).replace(/\n/g, "<br>"), t.showInvoice && esc(s.id),
     t.showDate && new Date(s.ts).toLocaleString("id-ID"), t.showKasir && "Kasir: " + esc(s.by),
     t.showMember && s.member && ("Plg: " + esc(s.member.name) + (s.member.phone ? " (" + esc(s.member.phone) + ")" : ""))
   ].filter(Boolean).join("<br>");
@@ -486,6 +488,7 @@ function receiptText(s, t = S.receipt) {
   const L = ["*" + t.title + "*"];
   if (t.sub) L.push(t.sub);
   if (t.showBranch) L.push("*" + s.branch + "*");
+  if (t.showAddress && branchAddr(s)) L.push(branchAddr(s));
   if (t.showInvoice) L.push("Nota: " + s.id);
   if (t.showDate) L.push(new Date(s.ts).toLocaleString("id-ID"));
   if (t.showKasir) L.push("Kasir: " + s.by);
@@ -634,7 +637,7 @@ function renderPay() {
   const qe = $("#qris");
   if (S.method === "QRIS") {
     if (!qe.firstChild) {
-      qe.innerHTML = `<img alt="QRIS" src="${esc(S.qris || "qris.png")}" style="width:100%; max-width:320px; display:block; margin:0 auto 16px; border-radius:8px">`;
+      qe.innerHTML = `<img alt="QRIS" src="${esc(S.qris || "qris.png")}" style="width:100%; max-width:160px; display:block; margin:0 auto 16px; border-radius:8px">`;
       qe.firstChild.onerror = () => { qe.innerHTML = `<div class="empty">Gambar QRIS belum tersedia. Admin dapat mengunggahnya di Pengaturan → QRIS.</div>`; };
     }
   } else qe.innerHTML = "";
@@ -1306,8 +1309,8 @@ function rSetCabang() {
   $("#set-content").innerHTML = `
     <div class="panel" style="max-width:800px">
       <div class="row" style="margin-bottom:16px"><h3 style="margin:0">Daftar Cabang</h3><button class="btn pri" data-newbr="1">+ Tambah Cabang</button></div>
-      <div class="wrap"><table><thead><tr><th>Nama Cabang</th><th>Kode</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
-        ${S.branches.map(b => `<tr><td><b>${esc(b.name)}</b></td><td>${esc(b.key)}</td><td>${b.active === false ? "Nonaktif" : "Aktif"}</td>
+      <div class="wrap"><table><thead><tr><th>Nama Cabang</th><th>Alamat</th><th>Kode</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
+        ${S.branches.map(b => `<tr><td><b>${esc(b.name)}</b></td><td style="min-width:160px; color:${b.address ? "inherit" : "var(--mute)"}">${esc(b.address || "belum diisi")}</td><td>${esc(b.key)}</td><td>${b.active === false ? "Nonaktif" : "Aktif"}</td>
           <td><button class="btn sm" data-editbr="${esc(b.key)}">Edit</button></td></tr>`).join("")}
       </tbody></table></div>
       <p style="font-size:12px; color:var(--mute); margin-top:12px">Kode cabang tidak bisa diubah agar data transaksi tetap terhubung. Cabang nonaktif tidak muncul saat memilih cabang di login, tetapi datanya tetap tersimpan.</p>
@@ -1318,19 +1321,20 @@ function openBranchForm(key) {
   if (!b) return;
   modal(`<h2>${key ? "Edit Cabang" : "Tambah Cabang"}</h2>
     <div class="form-group"><label>Nama Cabang</label><input id="fb-name" value="${esc(b.name)}"></div>
+    <div class="form-group"><label>Alamat Cabang (tampil di struk)</label><textarea id="fb-addr" maxlength="200" placeholder="Jl. ..., Kota">${esc(b.address || "")}</textarea></div>
     <label class="chk"><input type="checkbox" id="fb-active" ${b.active === false ? "" : "checked"}> Cabang aktif</label>
     <div class="dlg-actions"><button class="btn" data-close="1">Batal</button><button class="btn pri" id="fb-save" data-key="${esc(key || "")}">Simpan</button></div>`);
 }
 async function saveBranch(key) {
-  const name = $("#fb-name").value.trim(), active = $("#fb-active").checked;
+  const name = $("#fb-name").value.trim(), active = $("#fb-active").checked, address = $("#fb-addr").value.trim();
   if (!name) return toast("Nama cabang wajib diisi");
   if (S.branches.some(b => b.name.toLowerCase() === name.toLowerCase() && b.key !== key)) return toast("Nama cabang sudah dipakai");
   let list;
-  if (key) list = S.branches.map(b => b.key === key ? { ...b, name, active } : b);
+  if (key) list = S.branches.map(b => b.key === key ? { ...b, name, active, address } : b);
   else {
     let k = name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 12) || "cabang", n = 1, base = k;
     while (S.branches.some(b => b.key === k)) k = base + (++n);
-    list = [...S.branches, { key: k, name, active }];
+    list = [...S.branches, { key: k, name, active, address }];
   }
   if (!list.some(b => b.active !== false)) return toast("Minimal satu cabang harus aktif");
   try { await setDoc(doc(db, "meta", "branches"), { list }); S.branches = list; $("#dlg").close(); toast("Tersimpan"); view(); }
@@ -1344,7 +1348,7 @@ function rSetRole() {
     <div class="panel" style="max-width:800px">
       <div class="row" style="margin-bottom:16px"><h3 style="margin:0">Role & Hak Akses</h3><button class="btn pri" data-newrole="1">+ Tambah Role</button></div>
       <div class="wrap"><table><thead><tr><th>Role</th><th>Akses Aktif</th><th>Aksi</th></tr></thead><tbody>
-        <tr><td><b>Admin</b> <span class="tag">Google</span></td><td>Semua akses · hanya akun Google ${esc(adminEmail)}</td><td></td></tr>
+        <tr><td><b>Admin</b> <span class="tag">Google</span></td><td>Semua akses (tidak dapat diubah). Akun Google ${esc(adminEmail)} selalu admin; akun lain bisa dijadikan admin lewat Akun Staff.</td><td></td></tr>
         ${rows.map(([id, r]) => `<tr><td><b>${esc(r.name)}</b><br><small style="color:var(--mute)">${esc(id)}</small></td>
           <td>${PERMS.filter(([k]) => r.perms && r.perms[k]).map(([, l]) => esc(l)).join(", ") || "<i>Tidak ada</i>"}</td>
           <td><button class="btn sm" data-editrole="${esc(id)}">Edit</button></td></tr>`).join("")}
@@ -1389,7 +1393,7 @@ function rSetStaff() {
         <thead><tr><th>Username</th><th>Nama</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead>
         <tbody>
           ${items.map(s => { const me = s.id === S.me.uid; return `
-            <tr><td><b>${esc(s.username)}</b>${me ? " (Anda)" : ""}${s.role === "admin" ? ' <span class="tag bad">tidak berlaku</span>' : ""}</td><td>${esc(s.nama || "-")}</td>
+            <tr><td><b>${esc(s.username)}</b>${me ? " (Anda)" : ""}</td><td>${esc(s.nama || "-")}</td>
               <td><span class="tag" style="background:${s.role === "admin" ? "var(--acc)" : "var(--soft)"}">${esc(roleName(s.role))}</span></td>
               <td>${s.active === false ? "Nonaktif" : "Aktif"}</td>
               <td><button class="btn sm" data-editstaff="${esc(s.id)}">Edit</button>${me ? "" : ` <button class="btn sm del" data-delstaff="${esc(s.id)}">Hapus</button>`}</td></tr>`; }).join("") || `<tr><td colspan="5" class="empty">Memuat…</td></tr>`}
@@ -1399,7 +1403,7 @@ function rSetStaff() {
     </div>`;
 }
 function roleOptions(sel) {
-  return [...(sel === "admin" ? [["admin", "Admin lama (tidak berlaku)"]] : []), ...Object.entries(S.roles).map(([k, r]) => [k, r.name])].map(([k, n]) => `<option value="${esc(k)}" ${sel === k ? "selected" : ""}>${esc(n)}</option>`).join("");
+  return [["admin", "Admin"], ...Object.entries(S.roles).map(([k, r]) => [k, r.name])].map(([k, n]) => `<option value="${esc(k)}" ${sel === k ? "selected" : ""}>${esc(n)}</option>`).join("");
 }
 function openStaffForm(id) {
   const s = id ? S.staff.find(x => x.id === id) : { username: "", nama: "", role: "kasir", active: true };
@@ -1416,7 +1420,7 @@ function openStaffForm(id) {
 async function saveStaff(id) {
   const nama = $("#fs-nama").value.trim(), role = $("#fs-role").value;
   if (id) {
-    const patch = { nama }; if (id !== S.me.uid && role !== "admin") { patch.role = role; patch.active = $("#fs-active").checked; }
+    const patch = { nama }; if (id !== S.me.uid) { patch.role = role; patch.active = $("#fs-active").checked; }
     try { await setDoc(getDoc("users", id), patch, { merge: true }); $("#dlg").close(); toast("Akun diperbarui"); loadStaff(); }
     catch(e) { toast("Gagal: " + errMsg(e)); }
     return;
@@ -1470,7 +1474,7 @@ function readRc() {
 }
 function updRcPrev() {
   const e = $("#rc-prev"); if (!e) return;
-  e.innerHTML = receiptHTML({ id: "INV261101-AB12", ts: Date.now(), branch: S.me.branch, by: S.me.username, member: { name: "Nama Pelanggan", phone: "08123456789" },
+  e.innerHTML = receiptHTML({ id: "INV261101-AB12", ts: Date.now(), branch: S.me.branch, bk: S.me.bk, by: S.me.username, member: { name: "Nama Pelanggan", phone: "08123456789" },
     items: [{ name: "Parfum Contoh A", price: 75000, qty: 2 }, { name: "Parfum Contoh B", price: 50000, qty: 1 }], discount: 10000, total: 190000, method: "Tunai", paid: 200000, change: 10000 }, readRc());
 }
 async function saveRc() {
@@ -1686,15 +1690,14 @@ async function loadMe(user) {
     const s = await fsGetDoc(doc(db, "users", user.uid));
     if (!s.exists() || s.data().active === false) {
       await signOut(auth);
-      throw new Error(s.exists() ? "Akun dinonaktifkan." : (user.providerData.some(p => p.providerId === "google.com") ? "Akun Google ini tidak terdaftar sebagai admin." : "Akun belum diberi peran. Hubungi admin."));
+      throw new Error(s.exists() ? "Akun dinonaktifkan." : (user.providerData.some(p => p.providerId === "google.com") ? "Akun Google ini belum terdaftar. Hubungi admin." : "Akun belum diberi peran. Hubungi admin."));
     }
-    if (s.data().role === "admin") { await signOut(auth); throw new Error("Akun admin lama sudah tidak berlaku. Admin masuk dengan Google."); }
     me = { uid: user.uid, username: s.data().username || user.email.split("@")[0], role: s.data().role };
   }
   const [b, r] = await Promise.all([fsGetDoc(doc(db, "meta", "branches")), fsGetDoc(doc(db, "meta", "roles"))]);
   S.branches = b.exists() ? (b.data().list || DEF_BRANCHES) : DEF_BRANCHES;
   S.roles = r.exists() ? (r.data().map || {}) : DEF_ROLES;
-  if (owner) {
+  if (me.role === "admin") {
     const seeds = [];
     if (!b.exists()) seeds.push(setDoc(doc(db, "meta", "branches"), { list: DEF_BRANCHES }));
     if (!r.exists()) seeds.push(setDoc(doc(db, "meta", "roles"), { map: DEF_ROLES }));
