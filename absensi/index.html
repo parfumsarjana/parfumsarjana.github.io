@@ -3,22 +3,29 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Absensi</title>
 <style>
-:root{--bg:#f6f7f9;--c:#fff;--t:#1a1d21;--m:#6b7280;--p:#2563eb;--b:#e5e7eb}
-@media(prefers-color-scheme:dark){:root{--bg:#111418;--c:#1b1f26;--t:#eef0f3;--m:#9aa3af;--b:#2c323b}}
-*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:var(--bg);color:var(--t)}
-#app{max-width:980px;margin:auto;padding:12px}
-.card{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:14px;margin:10px 0}
+:root{--t:#111;--m:#6b7280;--y:#facc15;--b:#e5e7eb}
+*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:#fff;color:var(--t)}
+#app{max-width:520px;margin:auto;padding:14px}#app.w{max-width:1000px}
+.card{background:#fff;border:1px solid var(--b);border-radius:16px;padding:14px;margin:10px 0}.big{box-shadow:0 8px 30px #0001}
 .bar{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.row,.tabs{display:flex;gap:8px;flex-wrap:wrap}
-input,select,button{font:inherit;padding:9px 11px;border-radius:8px;border:1px solid var(--b);background:var(--c);color:var(--t);width:100%;margin:4px 0}
-button{cursor:pointer;width:auto}.row button{flex:1}
-button.p{background:var(--p);border-color:var(--p);color:#fff}
+.row,.tabs{display:flex;gap:8px;flex-wrap:wrap}.tabs{flex-wrap:nowrap;overflow-x:auto}.tabs button{white-space:nowrap}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+input,select,button{font:inherit;padding:11px 12px;border-radius:12px;border:1px solid var(--b);background:#fff;color:var(--t);width:100%;margin:4px 0}
+button{cursor:pointer;width:auto;font-weight:600}.row button{flex:1}
+button.p{background:var(--y);border-color:var(--y);color:#111}button.on{background:#111;border-color:#111;color:#fff}button:disabled{opacity:.4}
 label{display:block;color:var(--m);font-size:13px;margin-top:6px}
-video{width:100%;max-height:320px;background:#000;border-radius:10px;transform:scaleX(-1)}
+.ck{display:flex;align-items:center;gap:8px;color:var(--t);font-size:14px}.ck input{width:auto;margin:0}
+.chk{max-height:130px;overflow:auto;border:1px solid var(--b);border-radius:12px;padding:4px 10px}
+.top{display:flex;align-items:center;gap:12px}.top small{color:var(--m)}
+.av{width:46px;height:46px;border-radius:50%;padding:0;background:var(--y);border:2px solid #111;font-size:18px;margin:0}
+.hi{text-align:center;margin:18px 0 6px}.hi h2{margin:0;font-size:24px}.hi p{margin:4px 0;color:var(--m)}
+.clk{font-size:34px;font-weight:800}#dt{color:var(--m)}
+video{width:100%;max-height:240px;object-fit:cover;background:#000;border-radius:14px;transform:scaleX(-1);margin-top:10px}
+.kv{padding:7px 0;border-bottom:1px solid var(--b)}.kv small{color:var(--m)}
 .sc{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{padding:6px 8px;border-bottom:1px solid var(--b);text-align:left;white-space:nowrap}
 .err{color:#dc2626}.ok{color:#16a34a}img.t{width:44px;border-radius:6px}
-dialog{max-height:90vh;overflow:auto;border:1px solid var(--b);border-radius:12px;background:var(--c);color:var(--t);width:min(420px,94vw)}
+dialog{max-height:90vh;overflow:auto;border:1px solid var(--b);border-radius:16px;background:#fff;color:var(--t);width:min(440px,94vw)}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script></head><body><div id="app">Memuat…</div>
@@ -43,9 +50,9 @@ window.out=()=>signOut(auth);
 const bar=()=>`<div class="card bar"><b>Absensi</b><span>${esc(me?.name)} · ${me?.role||''}</span><button onclick="out()">Keluar</button></div>`;
 
 const form=(title,fields,v={},extra='')=>new Promise(r=>{const d=document.createElement('dialog');
-d.innerHTML=`<form method=dialog><h3>${title}</h3>${fields.map(([k,l,t,o])=>t=='map'?`<label>${l}</label><div class=row><input id=q placeholder="Cari tempat atau tempel link Google Maps"><button type=button id=sq>Cari</button><button type=button id=me2>Lokasi saya</button></div><div id=mp style="height:250px;border-radius:10px;margin:6px 0"></div><input type=hidden name=lat value="${v.lat??''}"><input type=hidden name=lng value="${v.lng??''}">`:`<label>${l}${t=='select'?`<select name=${k}>${opts(o,v[k])}</select>`:`<input name=${k} type="${t||'text'}" step=any value="${esc(v[k])}">`}</label>`).join('')}${extra}<div class=row><button value=x>Batal</button><button value=ok class=p>Simpan</button></div></form>`;
+d.innerHTML=`<form method=dialog><h3>${title}</h3>${fields.map(([k,l,t,o])=>t=='check'?`<label>${l}</label><div class=chk>${o.map(x=>`<label class=ck><input type=checkbox name=${k} value="${esc(x[0])}"${(v[k]||[]).includes(x[0])?' checked':''}> ${esc(x[1])}</label>`).join('')||'<small>Belum ada data</small>'}</div>`:t=='map'?`<label>${l}</label><div class=row><input id=q placeholder="Cari tempat atau tempel link Google Maps"><button type=button id=sq>Cari</button><button type=button id=me2>Lokasi saya</button></div><div id=mp style="height:250px;border-radius:10px;margin:6px 0"></div><input type=hidden name=lat value="${v.lat??''}"><input type=hidden name=lng value="${v.lng??''}">`:`<label>${l}${t=='select'?`<select name=${k}>${opts(o,v[k])}</select>`:`<input name=${k} type="${t||'text'}" step=any value="${esc(v[k])}">`}</label>`).join('')}${extra}<div class=row><button value=x>Batal</button><button value=ok class=p>Simpan</button></div></form>`;
 document.body.append(d);d.showModal();if(fields.some(f=>f[2]=='map'))mapInit(d);
-d.onclose=()=>{let o=null;if(d.returnValue=='ok'){o={};new FormData(d.querySelector('form')).forEach((x,k)=>o[k]=x);fields.forEach(f=>f[2]=='number'&&(o[f[0]]=+o[f[0]]||0));if('lat'in o){o.lat=+o.lat||0;o.lng=+o.lng||0}}d.remove();r(o)}});
+d.onclose=()=>{let o=null;if(d.returnValue=='ok'){o={};const fd=new FormData(d.querySelector('form'));fd.forEach((x,k)=>o[k]=x);fields.forEach(f=>f[2]=='check'&&(o[f[0]]=fd.getAll(f[0])));fields.forEach(f=>f[2]=='number'&&(o[f[0]]=+o[f[0]]||0));if('lat'in o){o.lat=+o.lat||0;o.lng=+o.lng||0}}d.remove();r(o)}});
 document.addEventListener('click',e=>{if(e.target.id=='gps')navigator.geolocation.getCurrentPosition(p=>{const f=e.target.form;f.lat.value=p.coords.latitude;f.lng.value=p.coords.longitude},x=>alert(x.message))});
 
 const mapInit=async d=>{const f=d.querySelector('form'),ll=f.lat,lg=f.lng,box=d.querySelector('#mp');
@@ -91,15 +98,25 @@ async function staffUI(){
 const [locs,shs,tasks,hist]=await Promise.all([list('locations'),list('shifts'),list('tasks',where('email','==',em)),list('attendance',where('email','==',em))]);
 hist.sort((a,b)=>(b.inAt||'').localeCompare(a.inAt||''));
 const open=hist.find(h=>h.inAt&&!h.outAt);
-view(bar()+`<div class=card><video id=v autoplay playsinline muted></video><canvas id=cv hidden></canvas>
-<label>Lokasi kerja<select id=lo>${opts(locs.map(l=>[l.id,l.name]),open?.locId||me.locId)}</select></label>
-<label>Shift<select id=sh>${opts(shs.map(s=>[s.id,`${s.name} (${s.start}-${s.end})`]),open?.shiftId||me.shiftId)}</select></label>
-<div class=row><button class=p id=bi ${open?'disabled':''}>Absen Datang</button><button id=bo ${open?'':'disabled'}>Absen Pulang</button></div><p id=st></p></div>
-<div class=card><b>Profil saya</b>${tbl(['Nama lengkap','No HP','NIK','Tempat, tgl lahir','Alamat','Posisi','Mulai kerja'],[[esc(me.name),esc(me.phone),esc(me.nik),esc([me.birthPlace,me.birthDate].filter(Boolean).join(', ')),esc(me.address),esc(me.position),me.startDate||'']])}</div>
-<div class=card><b>Tugas</b>${tasks.map(t=>`<label style="color:inherit"><input type=checkbox style="width:auto" data-k="${t.id}" ${t.done?'checked':''}> ${esc(t.text)}</label>`).join('')||'<p>Tidak ada tugas.</p>'}</div>
-<div class=card><b>Riwayat absen</b>${tbl(['Tanggal','Shift','Lokasi','Datang','Pulang','Jam'],hist.map(h=>[h.date,esc(h.shiftName),esc(h.locName),(h.inAt||'').slice(11),(h.outAt||'').slice(11),hrs(h).toFixed(1)]))}</div>`);
+$('#app').className='';
+const pick=(a,ids)=>ids.length?a.filter(x=>ids.includes(x.id)):a;
+const L2=pick(locs,me.locIds||(me.locId?[me.locId]:[])),S2=pick(shs,me.shiftIds||(me.shiftId?[me.shiftId]:[])),nt=tasks.filter(t=>!t.done).length;
+view(`<div class=top><button class=av id=pf>${esc((me.name||'?')[0].toUpperCase())}</button><div><b>${esc(me.name)}</b><br><small>${esc(me.position||'Staff')}</small></div></div>
+<div class=hi><h2>Halo 👋 ${esc((me.name||'').split(' ')[0])}</h2><p>Semangat kerja ya!</p></div>
+<div class="card big"><div id=clk class=clk></div><div id=dt></div><video id=v autoplay playsinline muted></video><canvas id=cv hidden></canvas>
+<div class=two><label>Lokasi<select id=lo>${opts(L2.map(l=>[l.id,l.name]),open?.locId)}</select></label><label>Shift<select id=sh>${opts(S2.map(s=>[s.id,`${s.name} (${s.start}-${s.end})`]),open?.shiftId)}</select></label></div>
+<div class=row><button class=p id=bi ${open?'disabled':''}>Masuk</button><button id=bo ${open?'':'disabled'}>Keluar</button></div><p id=st></p></div>
+<div class=row><button id=tg>Tugas${nt?` (${nt})`:''}</button><button id=rw>Riwayat Absen</button></div><div id=pn></div>`);
+clearInterval(window.ck);const tick=()=>{const e=$('#clk');if(!e)return clearInterval(window.ck);const n=new Date();e.textContent=n.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}).replace('.',':')+' WIB';$('#dt').textContent=n.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})};tick();window.ck=setInterval(tick,1000);
 navigator.mediaDevices?.getUserMedia({video:{facingMode:'user'}}).then(s=>$('#v').srcObject=s).catch(()=>$('#st').textContent='Kamera tidak bisa diakses');
-document.querySelectorAll('[data-k]').forEach(c=>c.onchange=()=>setDoc(doc(db,'tasks',c.dataset.k),{done:c.checked},{merge:true}));
+let sec='';const pane=k=>{sec=sec==k?'':k;const p=$('#pn');
+p.innerHTML=sec=='t'?`<div class=card>${tasks.map(t=>`<label class=ck><input type=checkbox data-k="${t.id}" ${t.done?'checked':''}> ${esc(t.text)}</label>`).join('')||'<p>Tidak ada tugas.</p>'}</div>`:sec=='r'?`<div class=card>${tbl(['Tanggal','Shift','Lokasi','Masuk','Keluar','Jam'],hist.map(h=>[h.date,esc(h.shiftName),esc(h.locName),(h.inAt||'').slice(11),(h.outAt||'').slice(11),hrs(h).toFixed(1)]))}</div>`:'';
+p.querySelectorAll('[data-k]').forEach(c=>c.onchange=()=>setDoc(doc(db,'tasks',c.dataset.k),{done:c.checked},{merge:true}));
+$('#tg').classList.toggle('on',sec=='t');$('#rw').classList.toggle('on',sec=='r')};
+$('#tg').onclick=()=>pane('t');$('#rw').onclick=()=>pane('r');
+$('#pf').onclick=()=>{const d=document.createElement('dialog'),P=[['Nama lengkap',me.name],['Email',me.email],['No HP',me.phone],['NIK',me.nik],['Jenis kelamin',{L:'Laki-laki',P:'Perempuan'}[me.gender]],['Tempat, tanggal lahir',[me.birthPlace,me.birthDate].filter(Boolean).join(', ')],['Alamat',me.address],['Kontak darurat',me.emergency],['Mulai bekerja',me.startDate],['Posisi',me.position],['Lokasi kerja',L2.map(x=>x.name).join(', ')],['Shift',S2.map(x=>`${x.name} (${x.start}-${x.end})`).join(', ')]];
+d.innerHTML=`<h3>Profil saya</h3>${P.map(([k,x])=>`<div class=kv><small>${k}</small><div>${esc(x)||'-'}</div></div>`).join('')}<div class=row><button id=x1>Tutup</button><button class=on onclick="out()">Keluar akun</button></div>`;
+document.body.append(d);d.showModal();d.querySelector('#x1').onclick=()=>d.close();d.onclose=()=>d.remove()};
 const act=async k=>{const st=$('#st');st.className='';try{
 st.textContent='Mengambil lokasi…';
 const p=await new Promise((a,b)=>navigator.geolocation.getCurrentPosition(a,b,{enableHighAccuracy:true,timeout:15000}));
@@ -116,7 +133,7 @@ $('#bi').onclick=()=>act('in');$('#bo').onclick=()=>act('out')}
 
 /* ADMIN */
 const TL={staff:'Staff',absensi:'Absensi',shifts:'Shift',locations:'Lokasi',positions:'Posisi',tasks:'Tugas',payroll:'Payroll'};
-async function adminUI(){
+async function adminUI(){$('#app').className='w';
 view(bar()+`<div class=tabs>${Object.entries(TL).map(([k,l])=>`<button data-t=${k} class="${k==tab?'p':''}">${l}</button>`).join('')}</div><div id=main></div>`);
 document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;adminUI()});
 try{await TABS[tab]($('#main'))}catch(e){$('#main').innerHTML=`<p class=err>${esc(e.message)}</p>`}}
@@ -134,8 +151,8 @@ const TABS={
 async staff(m){const [rows,pos,sh,lo]=await Promise.all([list('staff'),list('positions'),list('shifts'),list('locations')]);
 const nm=(a,i)=>esc(a.find(x=>x.id==i)?.name);
 await manage(m,{c:'staff',t:'Staff',head:['Nama lengkap','No HP','Email','NIK','Tempat, tgl lahir','Alamat','Posisi','Lokasi','Shift','Mulai kerja','Role','Gaji','Tipe',''],rows,
-f:[['name','Nama lengkap'],['phone','No HP','tel'],['email','Email','email'],['nik','NIK'],['gender','Jenis kelamin','select',[['','-'],['L','Laki-laki'],['P','Perempuan']]],['birthPlace','Tempat lahir'],['birthDate','Tanggal lahir','date'],['address','Alamat tempat tinggal'],['emergency','Kontak darurat (nama & no HP)'],['startDate','Mulai bekerja','date'],['role','Role','select',[['staff','Staff'],['admin','Admin']]],['position','Posisi','select',[['','-'],...pos.map(p=>[p.name,p.name])]],['locId','Lokasi kerja','select',[['','-'],...lo.map(l=>[l.id,l.name])]],['shiftId','Shift utama','select',[['','-'],...sh.map(s=>[s.id,s.name])]],['payType','Tipe gaji','select',PT],['rate','Gaji (Rp)','number']],
-cols:r=>[esc(r.name),esc(r.phone),esc(r.email),esc(r.nik),esc([r.birthPlace,r.birthDate].filter(Boolean).join(', ')),esc(r.address),esc(r.position),nm(lo,r.locId),nm(sh,r.shiftId),r.startDate||'',r.role,fr(r.rate||0),(PT.find(x=>x[0]==r.payType)||[])[1]||''],
+f:[['name','Nama lengkap'],['phone','No HP','tel'],['email','Email','email'],['nik','NIK'],['gender','Jenis kelamin','select',[['','-'],['L','Laki-laki'],['P','Perempuan']]],['birthPlace','Tempat lahir'],['birthDate','Tanggal lahir','date'],['address','Alamat tempat tinggal'],['emergency','Kontak darurat (nama & no HP)'],['startDate','Mulai bekerja','date'],['role','Role','select',[['staff','Staff'],['admin','Admin']]],['position','Posisi','select',[['','-'],...pos.map(p=>[p.name,p.name])]],['locIds','Lokasi kerja (boleh lebih dari satu)','check',lo.map(l=>[l.id,l.name])],['shiftIds','Shift (boleh lebih dari satu)','check',sh.map(s=>[s.id,s.name])],['payType','Tipe gaji','select',PT],['rate','Gaji (Rp)','number']],
+cols:r=>[esc(r.name),esc(r.phone),esc(r.email),esc(r.nik),esc([r.birthPlace,r.birthDate].filter(Boolean).join(', ')),esc(r.address),esc(r.position),(r.locIds||[r.locId]).map(i=>nm(lo,i)).filter(Boolean).join(', '),(r.shiftIds||[r.shiftId]).map(i=>nm(sh,i)).filter(Boolean).join(', '),r.startDate||'',r.role,fr(r.rate||0),(PT.find(x=>x[0]==r.payType)||[])[1]||''],
 id:(o,r)=>r?r.id:o.email.toLowerCase(),pre:(o,r)=>{if(!r)o.email=o.email.toLowerCase()},def:{role:'staff',payType:'hour'}})},
 async absensi(m){const [st,sh,all]=await Promise.all([list('staff'),list('shifts'),list('attendance')]);
 m.innerHTML=`<select id=fs><option value="">Semua staff</option>${opts(st.map(s=>[s.email,s.name]),FS)}</select>`;
