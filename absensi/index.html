@@ -19,7 +19,9 @@ video{width:100%;max-height:320px;background:#000;border-radius:10px;transform:s
 th,td{padding:6px 8px;border-bottom:1px solid var(--b);text-align:left;white-space:nowrap}
 .err{color:#dc2626}.ok{color:#16a34a}img.t{width:44px;border-radius:6px}
 dialog{max-height:90vh;overflow:auto;border:1px solid var(--b);border-radius:12px;background:var(--c);color:var(--t);width:min(420px,94vw)}
-</style></head><body><div id="app">Memuat…</div>
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script></head><body><div id="app">Memuat…</div>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
 import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithEmailAndPassword,createUserWithEmailAndPassword,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
@@ -41,10 +43,27 @@ window.out=()=>signOut(auth);
 const bar=()=>`<div class="card bar"><b>Absensi</b><span>${esc(me?.name)} · ${me?.role||''}</span><button onclick="out()">Keluar</button></div>`;
 
 const form=(title,fields,v={},extra='')=>new Promise(r=>{const d=document.createElement('dialog');
-d.innerHTML=`<form method=dialog><h3>${title}</h3>${fields.map(([k,l,t,o])=>`<label>${l}${t=='select'?`<select name=${k}>${opts(o,v[k])}</select>`:`<input name=${k} type="${t||'text'}" step=any value="${esc(v[k])}">`}</label>`).join('')}${extra}<div class=row><button value=x>Batal</button><button value=ok class=p>Simpan</button></div></form>`;
-document.body.append(d);d.showModal();
-d.onclose=()=>{let o=null;if(d.returnValue=='ok'){o={};new FormData(d.querySelector('form')).forEach((x,k)=>o[k]=x);fields.forEach(f=>f[2]=='number'&&(o[f[0]]=+o[f[0]]||0))}d.remove();r(o)}});
+d.innerHTML=`<form method=dialog><h3>${title}</h3>${fields.map(([k,l,t,o])=>t=='map'?`<label>${l}</label><div class=row><input id=q placeholder="Cari tempat atau tempel link Google Maps"><button type=button id=sq>Cari</button><button type=button id=me2>Lokasi saya</button></div><div id=mp style="height:250px;border-radius:10px;margin:6px 0"></div><input type=hidden name=lat value="${v.lat??''}"><input type=hidden name=lng value="${v.lng??''}">`:`<label>${l}${t=='select'?`<select name=${k}>${opts(o,v[k])}</select>`:`<input name=${k} type="${t||'text'}" step=any value="${esc(v[k])}">`}</label>`).join('')}${extra}<div class=row><button value=x>Batal</button><button value=ok class=p>Simpan</button></div></form>`;
+document.body.append(d);d.showModal();if(fields.some(f=>f[2]=='map'))mapInit(d);
+d.onclose=()=>{let o=null;if(d.returnValue=='ok'){o={};new FormData(d.querySelector('form')).forEach((x,k)=>o[k]=x);fields.forEach(f=>f[2]=='number'&&(o[f[0]]=+o[f[0]]||0));if('lat'in o){o.lat=+o.lat||0;o.lng=+o.lng||0}}d.remove();r(o)}});
 document.addEventListener('click',e=>{if(e.target.id=='gps')navigator.geolocation.getCurrentPosition(p=>{const f=e.target.form;f.lat.value=p.coords.latitude;f.lng.value=p.coords.longitude},x=>alert(x.message))});
+
+const mapInit=d=>{const f=d.querySelector('form'),ll=f.lat,lg=f.lng;
+const m=L.map(d.querySelector('#mp')).setView([+ll.value||-7.5666,+lg.value||110.8167],ll.value?17:13);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(m);
+let mk,ci;const rad=()=>+f.radius?.value||100;
+const put=(a,b,z)=>{ll.value=a;lg.value=b;mk?mk.setLatLng([a,b]):mk=L.marker([a,b]).addTo(m);ci?ci.setLatLng([a,b]).setRadius(rad()):ci=L.circle([a,b],{radius:rad()}).addTo(m);z&&m.setView([a,b],z)};
+if(ll.value)put(+ll.value,+lg.value);
+m.on('click',e=>put(e.latlng.lat,e.latlng.lng));
+f.radius?.addEventListener('input',()=>ci&&ci.setRadius(rad()));
+setTimeout(()=>m.invalidateSize(),150);
+const go=async()=>{const q=d.querySelector('#q').value.trim();if(!q)return;
+const g=q.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)||q.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/)||q.match(/^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/);
+if(g)return put(+g[1],+g[2],17);
+try{const r=await(await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q))).json();
+r[0]?put(+r[0].lat,+r[0].lon,17):alert('Tempat tidak ditemukan')}catch(e){alert('Pencarian gagal: '+e.message)}};
+d.querySelector('#sq').onclick=go;d.querySelector('#q').onkeydown=e=>{if(e.key=='Enter'){e.preventDefault();go()}};
+d.querySelector('#me2').onclick=()=>navigator.geolocation.getCurrentPosition(p=>put(p.coords.latitude,p.coords.longitude,17),x=>alert(x.message))};
 
 /* LOGIN */
 function L(){view(`<div class=card style="max-width:360px;margin:10vh auto"><h2>Absensi</h2><input id=em type=email placeholder=Email><input id=pw type=password placeholder=Password><div class=row><button class=p id=li>Masuk</button><button id=su>Daftar</button></div><button id=go style="width:100%">Masuk dengan Google</button><p id=er class=err></p></div>`);
@@ -97,7 +116,7 @@ try{await TABS[tab]($('#main'))}catch(e){$('#main').innerHTML=`<p class=err>${es
 
 async function manage(m,{c,t,f,rows,cols,head,id,pre,def={}}){
 m.insertAdjacentHTML('beforeend',`<p><button class=p id=ad>+ Tambah ${t}</button></p><div class=card>${tbl(head,rows.map(r=>[...cols(r),`<button data-e="${r.id}">Edit</button> <button data-d="${r.id}">Hapus</button>`]))}</div>`);
-const sv=async r=>{const o=await form(t,f,r||def,c=='locations'?'<button type=button id=gps>Isi dari GPS saya</button>':'');if(!o)return;pre&&pre(o,r);
+const sv=async r=>{const o=await form(t,f,r||def);if(!o)return;pre&&pre(o,r);
 await setDoc(doc(db,c,id?id(o,r):(r?r.id:doc(collection(db,c)).id)),o,{merge:true});adminUI()};
 m.querySelector('#ad').onclick=()=>sv();
 m.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>sv(rows.find(r=>r.id==b.dataset.e)));
@@ -122,7 +141,7 @@ cols:r=>[r.date,esc(r.name),esc(r.shiftName),esc(r.locName),(r.inAt||'').slice(1
 id:(o,r)=>r?r.id:`${o.email}_${o.inAt.slice(0,10)}_${o.shiftId}`,
 pre:o=>{o.date=o.inAt.slice(0,10);o.name=st.find(s=>s.email==o.email)?.name;o.shiftName=sh.find(s=>s.id==o.shiftId)?.name},def:{inAt:nowL()}})},
 async shifts(m){const rows=await list('shifts');await manage(m,{c:'shifts',t:'Shift',head:['Nama','Mulai','Selesai',''],rows,f:[['name','Nama shift'],['start','Jam mulai','time'],['end','Jam selesai','time']],cols:r=>[esc(r.name),r.start,r.end]})},
-async locations(m){const rows=await list('locations');await manage(m,{c:'locations',t:'Lokasi',head:['Nama','Lat','Lng','Radius (m)',''],rows,f:[['name','Nama lokasi'],['lat','Latitude','number'],['lng','Longitude','number'],['radius','Radius (meter)','number']],cols:r=>[esc(r.name),r.lat,r.lng,r.radius],def:{radius:100}})},
+async locations(m){const rows=await list('locations');await manage(m,{c:'locations',t:'Lokasi',head:['Nama','Titik','Radius (m)',''],rows,f:[['name','Nama lokasi'],['radius','Radius (meter)','number'],['lat','Titik lokasi: klik peta atau cari','map']],cols:r=>[esc(r.name),`<a href="https://www.google.com/maps?q=${r.lat},${r.lng}" target=_blank>Lihat di Google Maps</a>`,r.radius],pre:o=>{if(!o.lat){alert('Pilih titik lokasi di peta dulu');throw 0}},def:{radius:100}})},
 async positions(m){const rows=await list('positions');await manage(m,{c:'positions',t:'Posisi',head:['Posisi',''],rows,f:[['name','Nama posisi']],cols:r=>[esc(r.name)]})},
 async tasks(m){const st=await list('staff');FS=FS||st[0]?.email||'';
 m.innerHTML=`<select id=fs>${opts(st.map(s=>[s.email,s.name]),FS)}</select>`;$('#fs').onchange=e=>{FS=e.target.value;adminUI()};
