@@ -33,6 +33,9 @@ video{width:100%;max-height:240px;object-fit:cover;background:#000;border-radius
 th,td{padding:6px 8px;border-bottom:1px solid var(--b);text-align:left;white-space:nowrap}
 .err{color:#dc2626}.ok{color:#16a34a}img.t{width:44px;border-radius:6px}
 dialog{max-height:90vh;overflow:auto;border:1px solid var(--b);border-radius:16px;background:#fff;color:var(--t);width:min(440px,94vw)}
+.tc{border:1px solid var(--b);border-radius:14px;padding:12px 14px;margin:8px 0;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer}
+.tc small{color:var(--m)}.tc.done{background:var(--y);border-color:var(--y);cursor:default}.tc.done small{color:#111}.tc.lock{opacity:.5;cursor:not-allowed}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.sg div{border:1px solid var(--b);border-radius:12px;padding:10px}.sg b{font-size:22px;display:block}.sg small{color:var(--m)}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script></head><body><div id="app">Memuat…</div>
@@ -58,6 +61,13 @@ const chips=(st,sel,all)=>`<div class=chips>${all?`<button class="chip${sel?'':'
 const bindChips=(m,f)=>m.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>f(b.dataset.s));
 const rng=(a,b)=>`<div class=two><label>Dari<input type=date id=d1 value="${a}"></label><label>Sampai<input type=date id=d2 value="${b}"></label></div>`;
 const bindRng=(m,f)=>{m.querySelector('#d1').onchange=e=>{DA=e.target.value;f()};m.querySelector('#d2').onchange=e=>{DB=e.target.value;f()}};
+let MO=today().slice(0,7);
+const summ=(email,att,tk,lg,shs,mo)=>{const [y,m]=mo.split('-').map(Number),S=mo+'-01',last=fmtD(new Date(y,m,0)),E=last<today()?last:today();
+const a=att.filter(x=>x.email==email&&x.date>=S&&x.date<=E&&x.inAt),late=a.filter(x=>{const sh=shs.find(s=>s.id==x.shiftId);return sh&&x.inAt.slice(11)>sh.start}).length;
+const tr=taskRows(tk.filter(t=>t.email==email),lg,S,E);
+return {days:new Set(a.map(x=>x.date)).size,n:a.length,late,jam:a.reduce((n,x)=>n+hrs(x),0),noOut:a.filter(x=>!x.outAt).length,tt:tr.length,td:tr.filter(r=>r.done).length}};
+const tiles=r=>`<div class=sg>${[[r.days,'Hari masuk'],[r.n-r.late,'Tepat waktu'],[r.late,'Tidak tepat waktu'],[r.jam.toFixed(1),'Total jam kerja'],[r.noOut,'Belum absen pulang'],[r.td+' / '+r.tt,'Tugas selesai'],[r.tt-r.td,'Tugas tidak selesai']].map(([v,l])=>`<div><b>${v}</b><small>${l}</small></div>`).join('')}</div>`;
+const csv=(n,h,r)=>{const q=x=>'"'+String(x??'').replace(/"/g,'""')+'"',b=new Blob(['\ufeff'+[h,...r].map(l=>l.map(q).join(',')).join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n+'.csv';a.click()};
 const taskRows=(tk,lg,a,b)=>{const o=[];for(let d=new Date(a+'T00:00');fmtD(d)<=b&&o.length<3000;d.setDate(d.getDate()+1)){const ds=fmtD(d);tk.forEach(t=>{if(t.created&&ds<t.created)return;const l=lg.find(x=>x.id==t.id+'_'+ds);o.push({email:t.email,text:t.text,time:t.time,date:ds,done:!!l?.done,doneAt:l?.doneAt||''})})}return o};
 window.out=()=>signOut(auth);
 const bar=()=>`<div class="card bar"><b>Absensi</b><span>${esc(me?.name)} · ${me?.role||''}</span><button onclick="out()">Keluar</button></div>`;
@@ -115,22 +125,32 @@ $('#app').className='';
 const pick=(a,ids)=>a.filter(x=>ids.includes(x.id));
 const L2=pick(locs,me.locIds||(me.locId?[me.locId]:[])),S2=pick(shs,me.shiftIds||(me.shiftId?[me.shiftId]:[]));
 const tdy=today(),tk0=tasks.filter(t=>!t.created||t.created<=tdy).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
-const isDone=t=>!!lg.find(x=>x.id==t.id+'_'+tdy)?.done,nt=tk0.filter(t=>!isDone(t)).length;
+const doneToday=hist.some(h=>h.date==tdy&&h.inAt);
 view(`<div class=top><button class=avb id=pf>${av(me.photo,me.name)}</button><div><b>${esc(me.name)}</b><br><small>${esc(me.position||'Staff')}</small></div></div>
 <div class=hi><h2>Halo 👋 ${esc((me.name||'').split(' ')[0])}</h2><p>Semangat kerja ya!</p></div>
-<div class="card big"><div id=clk class=clk></div><div id=dt></div><div class=row style="margin-top:12px"><button class=p id=bi ${open?'disabled':''}>Masuk</button><button id=bo ${open?'':'disabled'}>Keluar</button></div></div>
-<div class=row><button id=bt>Tugas${nt?` (${nt})`:''}</button><button id=bh>Riwayat Tugas</button><button id=br>Riwayat Absen</button></div><div id=pn></div>`);
+<div class="card big"><div id=clk class=clk></div><div id=dt></div><div class=row style="margin-top:12px"><button class=p id=bi ${open||doneToday?'disabled':''}>Masuk</button><button id=bo ${open?'':'disabled'}>Keluar</button></div>${doneToday&&!open?'<p class=ok>Absen hari ini sudah selesai.</p>':''}</div>
+<div class=card><b>Tugas hari ini</b><div id=tl></div></div>
+<div class=row><button id=bh>Riwayat Tugas</button><button id=br>Riwayat Absen</button><button id=bs>Summary</button></div><div id=pn></div>`);
 clearInterval(window.ck);const tick=()=>{const e=$('#clk');if(!e)return clearInterval(window.ck);const n=new Date();e.textContent=n.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}).replace('.',':')+' WIB';$('#dt').textContent=n.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})};tick();window.ck=setInterval(tick,1000);
-const tog=async c=>{const t=tasks.find(x=>x.id==c.dataset.k),id=t.id+'_'+tdy;
-if(t.time&&nowL().slice(11)<t.time){c.checked=!c.checked;return alert('Tugas ini baru bisa dikerjakan jam '+t.time)}
-const rec={email:em,name:me.name,taskId:t.id,text:t.text,time:t.time||'',date:tdy,done:c.checked,doneAt:c.checked?nowL().slice(11):''};
-await setDoc(doc(db,'taskLog',id),rec);const i=lg.findIndex(x=>x.id==id);i<0?lg.push({id,...rec}):lg[i]={id,...rec}};
-let sec='';
-const draw=()=>{const p=$('#pn'),H=sec=='h'?tbl(['Tanggal','Tugas','Jam','Status','Selesai'],taskRows(tasks,lg,DA,DB).sort((a,b)=>b.date.localeCompare(a.date)).map(r=>[r.date,esc(r.text),r.time||'-',r.done?'<b class=ok>Selesai</b>':'<span class=err>Belum</span>',r.doneAt])):tbl(['Tanggal','Shift','Lokasi','Masuk','Keluar','Jam'],hist.filter(h=>h.date>=DA&&h.date<=DB).map(h=>[h.date,esc(h.shiftName),esc(h.locName),(h.inAt||'').slice(11),(h.outAt||'').slice(11),hrs(h).toFixed(1)]));
-p.innerHTML=!sec?'':`<div class=card>${sec=='t'?tk0.map(t=>`<label class="ck tk"><span><input type=checkbox data-k="${t.id}" ${isDone(t)?'checked':''}> ${esc(t.text)}</span><small>${t.time||''}</small></label>`).join('')||'<p>Tidak ada tugas.</p>':rng(DA,DB)+H}</div>`;
-if(sec&&sec!='t')bindRng(p,draw);p.querySelectorAll('[data-k]').forEach(c=>c.onchange=()=>tog(c));
-['t','h','r'].forEach(k=>$('#b'+k).classList.toggle('on',sec==k))};
-[['t','t'],['h','h'],['r','r']].forEach(([k])=>$('#b'+k).onclick=()=>{sec=sec==k?'':k;draw()});
+const tog=async k=>{const t=tasks.find(x=>x.id==k),id=k+'_'+tdy;
+if(lg.find(x=>x.id==id)?.done)return;
+if(t.time&&nowL().slice(11)<t.time)return alert('Tugas ini baru bisa dikerjakan jam '+t.time);
+if(!confirm('Tandai tugas ini selesai? Tidak bisa dibatalkan.'))return;
+const rec={email:em,name:me.name,taskId:k,text:t.text,time:t.time||'',date:tdy,done:true,doneAt:nowL().slice(11)};
+try{await setDoc(doc(db,'taskLog',id),rec);lg.push({id,...rec});drawT();draw()}catch(e){alert(e.message)}};
+const drawT=()=>{$('#tl').innerHTML=tk0.map(t=>{const l=lg.find(x=>x.id==t.id+'_'+tdy),d=l?.done,lock=!d&&t.time&&nowL().slice(11)<t.time;
+return `<div class="tc${d?' done':''}${lock?' lock':''}" data-k="${t.id}"><div><b>${esc(t.text)}</b><br><small>${d?'✓ Selesai '+l.doneAt:lock?'Bisa dikerjakan jam '+t.time:'Ketuk untuk menandai selesai'}</small></div><span>${t.time||''}</span></div>`}).join('')||'<p>Tidak ada tugas hari ini.</p>';
+document.querySelectorAll('.tc').forEach(c=>c.onclick=()=>tog(c.dataset.k))};
+let sec='r';
+const draw=()=>{const p=$('#pn');let h='';
+if(sec=='h')h=rng(DA,DB)+tbl(['Tanggal','Tugas','Jam','Status','Selesai'],taskRows(tasks,lg,DA,DB).sort((a,b)=>b.date.localeCompare(a.date)).map(r=>[r.date,esc(r.text),r.time||'-',r.done?'<b class=ok>Selesai</b>':'<span class=err>Belum</span>',r.doneAt]));
+else if(sec=='r')h=rng(DA,DB)+tbl(['Tanggal','Shift','Lokasi','Masuk','Keluar','Jam'],hist.filter(x=>x.date>=DA&&x.date<=DB).map(x=>[x.date,esc(x.shiftName),esc(x.locName),(x.inAt||'').slice(11),(x.outAt||'').slice(11),hrs(x).toFixed(1)]));
+else h=`<label>Bulan<input type=month id=mo value="${MO}"></label>`+tiles(summ(em,hist,tasks,lg,shs,MO));
+p.innerHTML=`<div class=card>${h}</div>`;
+if(sec=='s')$('#mo').onchange=e=>{MO=e.target.value;draw()};else bindRng(p,draw);
+[['h','bh'],['r','br'],['s','bs']].forEach(([k,b])=>$('#'+b).classList.toggle('on',sec==k))};
+[['h','bh'],['r','br'],['s','bs']].forEach(([k,b])=>$('#'+b).onclick=()=>{sec=k;draw()});
+drawT();draw();
 const ph=f=>new Promise(ok=>{const i=new Image();i.onload=()=>{const c=document.createElement('canvas'),z=240,k=Math.min(i.width,i.height);c.width=c.height=z;c.getContext('2d').drawImage(i,(i.width-k)/2,(i.height-k)/2,k,k,0,0,z,z);ok(c.toDataURL('image/jpeg',.7))};i.src=URL.createObjectURL(f)});
 $('#pf').onclick=()=>{const d=document.createElement('dialog'),P=[['Nama lengkap',me.name],['Email',me.email],['No HP',me.phone],['NIK',me.nik],['Jenis kelamin',{L:'Laki-laki',P:'Perempuan'}[me.gender]],['Tempat, tanggal lahir',[me.birthPlace,me.birthDate].filter(Boolean).join(', ')],['Alamat',me.address],['Kontak darurat',me.emergency],['Mulai bekerja',me.startDate],['Posisi',me.position],['Lokasi kerja',L2.map(x=>x.name).join(', ')],['Shift',S2.map(x=>`${x.name} (${x.start}-${x.end})`).join(', ')]];
 d.className='pf';d.innerHTML=`<div class=ph><div id=pa>${av(me.photo,me.name,'av big2')}</div><label class=btn>Ubah foto<input type=file accept="image/*" hidden id=fi></label><b>${esc(me.name)}</b><small>${esc(me.position||'')}</small></div><div class=mid>${P.map(([k,x])=>`<div class=kv><small>${k}</small><div>${esc(x)||'-'}</div></div>`).join('')}</div><div class=ft><button id=x1>Tutup</button><button class=on onclick="out()">Log out</button></div>`;
@@ -144,7 +164,7 @@ document.body.append(d);d.showModal();
 navigator.mediaDevices?.getUserMedia({video:{facingMode:'user'}}).then(s=>{d.stream=s;d.querySelector('#v').srcObject=s}).catch(()=>d.querySelector('#st').textContent='Kamera tidak bisa diakses');
 d.onclose=()=>{d.stream?.getTracks().forEach(t=>t.stop());d.remove()};d.querySelector('#cx').onclick=()=>d.close();d.querySelector('#go').onclick=()=>act(k)};
 const act=async k=>{const st=$('#st');st.className='';try{
-st.textContent='Mengambil lokasi…';
+if(k=='in'&&hist.some(h=>h.date==today()&&h.inAt))throw Error('Anda sudah absen hari ini');st.textContent='Mengambil lokasi…';
 const p=await new Promise((a,b)=>navigator.geolocation.getCurrentPosition(a,b,{enableHighAccuracy:true,timeout:15000}));
 const l=locs.find(x=>x.id==$('#lo').value),sh=shs.find(x=>x.id==$('#sh').value);if(!l||!sh)throw Error('Pilih lokasi dan shift');
 const dist=Math.round(hav(p.coords.latitude,p.coords.longitude,l.lat,l.lng));
@@ -158,7 +178,7 @@ document.querySelectorAll('dialog.ab').forEach(x=>x.close());staffUI()}catch(e){
 $('#bi').onclick=()=>dlg('in');$('#bo').onclick=()=>dlg('out')}
 
 /* ADMIN */
-const TL={staff:'Staff',absensi:'Absensi',shifts:'Shift',locations:'Lokasi',positions:'Posisi',tasks:'Tugas',taskhist:'Riwayat Tugas',cutoffs:'Cut Off',payroll:'Payroll'};
+const TL={staff:'Staff',absensi:'Absensi',summary:'Summary',shifts:'Shift',locations:'Lokasi',positions:'Posisi',tasks:'Tugas',taskhist:'Riwayat Tugas',cutoffs:'Cut Off',payroll:'Payroll'};
 async function adminUI(){$('#app').className='w';
 view(bar()+`<div class=tabs>${Object.entries(TL).map(([k,l])=>`<button data-t=${k} class="${k==tab?'p':''}">${l}</button>`).join('')}</div><div id=main></div>`);
 document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;adminUI()});
@@ -182,8 +202,9 @@ cols:r=>[esc(r.name),esc(r.phone),esc(r.email),esc(r.nik),esc([r.birthPlace,r.bi
 id:(o,r)=>r?r.id:o.email.toLowerCase(),pre:(o,r)=>{if(!r)o.email=o.email.toLowerCase()},def:{role:'staff',payType:'hour'}})},
 async absensi(m){const [st,sh,all]=await Promise.all([list('staff'),list('shifts'),list('attendance')]);
 m.innerHTML=chips(st,FS,1)+rng(DA,DB);bindChips(m,v=>{FS=v;adminUI()});bindRng(m,adminUI);
-const rows=all.filter(a=>(!FS||a.email==FS)&&a.date>=DA&&a.date<=DB).sort((a,b)=>(b.inAt||'').localeCompare(a.inAt||'')).slice(0,200);
+const rows=all.filter(a=>(!FS||a.email==FS)&&a.date>=DA&&a.date<=DB).sort((a,b)=>(b.inAt||'').localeCompare(a.inAt||''));
 const img=s=>s?`<img class=t src="${s}">`:'';
+m.insertAdjacentHTML('beforeend','<button id=ex>Export CSV</button>');$('#ex').onclick=()=>csv('absensi',['Tanggal','Nama','Email','Shift','Lokasi','Masuk','Pulang','Jam','Jarak masuk (m)','Jarak pulang (m)'],rows.map(r=>[r.date,r.name,r.email,r.shiftName,r.locName,r.inAt,r.outAt,hrs(r).toFixed(1),r.inDist,r.outDist]));
 await manage(m,{c:'attendance',t:'Absensi',head:['Tanggal','Nama','Shift','Lokasi','Datang','Pulang','Jam','Foto',''],rows,
 f:[['email','Staff','select',st.map(s=>[s.email,s.name])],['shiftId','Shift','select',sh.map(s=>[s.id,s.name])],['inAt','Datang','datetime-local'],['outAt','Pulang','datetime-local']],
 cols:r=>[r.date,esc(r.name),esc(r.shiftName),esc(r.locName),(r.inAt||'').slice(11),(r.outAt||'').slice(11),hrs(r).toFixed(1),img(r.inPhoto)+img(r.outPhoto)],
@@ -192,6 +213,12 @@ pre:o=>{o.date=o.inAt.slice(0,10);o.name=st.find(s=>s.email==o.email)?.name;o.sh
 async shifts(m){const rows=await list('shifts');await manage(m,{c:'shifts',t:'Shift',head:['Nama','Mulai','Selesai',''],rows,f:[['name','Nama shift'],['start','Jam mulai','time'],['end','Jam selesai','time']],cols:r=>[esc(r.name),r.start,r.end]})},
 async locations(m){const rows=await list('locations');await manage(m,{c:'locations',t:'Lokasi',head:['Nama','Titik','Radius (m)',''],rows,f:[['name','Nama lokasi'],['radius','Radius (meter)','number'],['lat','Titik lokasi: klik peta atau cari','map']],cols:r=>[esc(r.name),`<a href="https://www.google.com/maps?q=${r.lat},${r.lng}" target=_blank>Lihat di Google Maps</a>`,r.radius],pre:o=>{if(!o.lat){alert('Pilih titik lokasi di peta dulu');throw 0}},def:{radius:100}})},
 async positions(m){const rows=await list('positions');await manage(m,{c:'positions',t:'Posisi',head:['Posisi',''],rows,f:[['name','Nama posisi']],cols:r=>[esc(r.name)]})},
+async summary(m){const [st,att,tk,lg,sh]=await Promise.all([list('staff'),list('attendance'),list('tasks'),list('taskLog'),list('shifts')]);
+m.innerHTML=chips(st,FS,1)+`<label>Bulan<input type=month id=mo value="${MO}"></label>`;bindChips(m,v=>{FS=v;adminUI()});$('#mo').onchange=e=>{MO=e.target.value;adminUI()};
+const H=['Nama','Hari masuk','Tepat waktu','Tidak tepat waktu','Total jam','Belum absen pulang','Tugas selesai','Tugas tidak selesai'];
+const rows=st.filter(s=>!FS||s.email==FS).map(s=>{const r=summ(s.email,att,tk,lg,sh,MO);return [s.name,r.days,r.n-r.late,r.late,r.jam.toFixed(1),r.noOut,r.td,r.tt-r.td]});
+m.insertAdjacentHTML('beforeend','<button id=ex>Export CSV</button>');$('#ex').onclick=()=>csv('summary-'+MO,H,rows);
+m.insertAdjacentHTML('beforeend',`<div class=card>${tbl(H,rows.map(r=>[esc(r[0]),...r.slice(1)]))}</div>`)},
 async tasks(m){const st=await list('staff');FS=FS||st[0]?.email||'';
 m.innerHTML=chips(st,FS);bindChips(m,v=>{FS=v;adminUI()});
 const rows=(await list('tasks',where('email','==',FS))).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
@@ -200,6 +227,7 @@ async taskhist(m){const [st,tk,lg]=await Promise.all([list('staff'),list('tasks'
 m.innerHTML=chips(st,FS,1)+rng(DA,DB)+`<select id=ts><option value="">Semua status</option><option value=1${TS=='1'?' selected':''}>Selesai</option><option value=0${TS=='0'?' selected':''}>Belum selesai</option></select>`;
 bindChips(m,v=>{FS=v;adminUI()});bindRng(m,adminUI);$('#ts').onchange=e=>{TS=e.target.value;adminUI()};
 const rows=taskRows(tk.filter(t=>!FS||t.email==FS),lg,DA,DB).filter(r=>!TS||r.done==(TS=='1')).sort((a,b)=>b.date.localeCompare(a.date));
+m.insertAdjacentHTML('beforeend','<button id=ex>Export CSV</button>');$('#ex').onclick=()=>csv('riwayat-tugas',['Tanggal','Staff','Tugas','Jam','Status','Selesai pada'],rows.map(r=>[r.date,st.find(s=>s.email==r.email)?.name,r.text,r.time,r.done?'Selesai':'Belum',r.doneAt]));
 m.insertAdjacentHTML('beforeend',`<div class=card>${tbl(['Tanggal','Staff','Tugas','Jam','Status','Selesai pada'],rows.map(r=>[r.date,esc(st.find(s=>s.email==r.email)?.name),esc(r.text),r.time||'-',r.done?'<b class=ok>Selesai</b>':'<span class=err>Belum</span>',r.doneAt]))}</div>`)},
 async cutoffs(m){const rows=await list('cutoffs');await manage(m,{c:'cutoffs',t:'Cut Off',head:['Nama','Tanggal cut off',''],rows,f:[['name','Nama cut off (mis. Bulanan tgl 25)'],['day','Tanggal cut off (1-31)','number']],cols:r=>[esc(r.name),r.day],def:{day:25}})},
 async payroll(m){PM=PM||today().slice(0,7);const [y,mm]=PM.split('-').map(Number);
@@ -210,7 +238,7 @@ const a=att.filter(x=>x.email==p.email&&x.date>=S&&x.date<=E&&x.outAt),h=a.reduc
 const base=(p.payType=='day'?d:p.payType=='shift'?a.length:h)*(p.rate||0),aj=adj.find(x=>x.id==PM+'_'+p.email)||{amt:0};
 return {p,S,E,c,h,d,n:a.length,base,aj,tot:base+(aj.amt||0)}});
 m.innerHTML=`<div class=card><label>Bulan payroll<input type=month id=pm value="${PM}"></label>${tbl(['Nama','Cut off','Periode','Jam','Hari','Shift','Gaji dasar','Penyesuaian','Total',''],rows.map(r=>[esc(r.p.name),esc(r.c?.name||'Default tgl 25'),r.S+' s/d '+r.E,r.h.toFixed(1),r.d,r.n,fr(r.base),fr(r.aj.amt||0)+(r.aj.note?' ('+esc(r.aj.note)+')':''),'<b>'+fr(r.tot)+'</b>',`<button data-a="${esc(r.p.email)}">Edit</button>`]))}</div>`;
-$('#pm').onchange=x=>{PM=x.target.value;adminUI()};
+$('#pm').onchange=x=>{PM=x.target.value;adminUI()};m.insertAdjacentHTML('afterbegin','<button id=ex>Export CSV</button>');$('#ex').onclick=()=>csv('payroll-'+PM,['Nama','Cut off','Periode','Jam','Hari','Shift','Gaji dasar','Penyesuaian','Catatan','Total'],rows.map(r=>[r.p.name,r.c?.name||'Default tgl 25',r.S+' s/d '+r.E,r.h.toFixed(1),r.d,r.n,Math.round(r.base),r.aj.amt||0,r.aj.note||'',Math.round(r.tot)]));
 m.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const k=PM+'_'+b.dataset.a,o=await form('Penyesuaian payroll',[['amt','Bonus (+) / potongan (-) Rp','number'],['note','Catatan']],adj.find(x=>x.id==k)||{});
 if(o){await setDoc(doc(db,'adjust',k),{...o,period:PM,email:b.dataset.a});adminUI()}})}
 };
