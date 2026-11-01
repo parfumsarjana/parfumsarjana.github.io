@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Absensi</title>
+<style>
+:root{--bg:#f6f7f9;--c:#fff;--t:#1a1d21;--m:#6b7280;--p:#2563eb;--b:#e5e7eb}
+@media(prefers-color-scheme:dark){:root{--bg:#111418;--c:#1b1f26;--t:#eef0f3;--m:#9aa3af;--b:#2c323b}}
+*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:var(--bg);color:var(--t)}
+#app{max-width:980px;margin:auto;padding:12px}
+.card{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:14px;margin:10px 0}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.row,.tabs{display:flex;gap:8px;flex-wrap:wrap}
+input,select,button{font:inherit;padding:9px 11px;border-radius:8px;border:1px solid var(--b);background:var(--c);color:var(--t);width:100%;margin:4px 0}
+button{cursor:pointer;width:auto}.row button{flex:1}
+button.p{background:var(--p);border-color:var(--p);color:#fff}
+label{display:block;color:var(--m);font-size:13px;margin-top:6px}
+video{width:100%;max-height:320px;background:#000;border-radius:10px;transform:scaleX(-1)}
+.sc{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--b);text-align:left;white-space:nowrap}
+.err{color:#dc2626}.ok{color:#16a34a}img.t{width:44px;border-radius:6px}
+dialog{max-height:90vh;overflow:auto;border:1px solid var(--b);border-radius:12px;background:var(--c);color:var(--t);width:min(420px,94vw)}
+</style></head><body><div id="app">Memuat…</div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
+import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithEmailAndPassword,createUserWithEmailAndPassword,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
+import {getFirestore,collection,doc,getDoc,getDocs,setDoc,deleteDoc,query} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+import {where} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+const app=initializeApp({apiKey:"AIzaSyBhjjjooVet5-2xZW2wnV3M0bRQJwSrVtU",authDomain:"absensi-9a933.firebaseapp.com",projectId:"absensi-9a933",storageBucket:"absensi-9a933.firebasestorage.app",messagingSenderId:"1000007340641",appId:"1:1000007340641:web:80698cab06303577b59020"});
+const auth=getAuth(app),db=getFirestore(app);
+const $=s=>document.querySelector(s),view=h=>$('#app').innerHTML=h;
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const list=async(c,...w)=>(await getDocs(w.length?query(collection(db,c),...w):collection(db,c))).docs.map(d=>({id:d.id,...d.data()}));
+const nowL=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16);
+const fmtD=d=>d.toLocaleDateString('sv'),fr=n=>'Rp '+Math.round(n).toLocaleString('id-ID');
+const hrs=h=>h.inAt&&h.outAt?(new Date(h.outAt)-new Date(h.inAt))/36e5:0;
+const hav=(a,b,c,d)=>{const r=x=>x*Math.PI/180,x=Math.sin(r(c-a)/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(r(d-b)/2)**2;return 12742e3*Math.asin(Math.sqrt(x))};
+const tbl=(h,r)=>`<div class=sc><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${r.map(x=>`<tr>${x.map(c=>`<td>${c??''}</td>`).join('')}</tr>`).join('')}</table></div>`;
+const opts=(a,v)=>a.map(x=>`<option value="${esc(x[0])}"${x[0]==v?' selected':''}>${esc(x[1])}</option>`).join('');
+let me,em,tab='staff',PM,FS='';
+window.out=()=>signOut(auth);
+const bar=()=>`<div class="card bar"><b>Absensi</b><span>${esc(me?.name)} · ${me?.role||''}</span><button onclick="out()">Keluar</button></div>`;
+
+const form=(title,fields,v={},extra='')=>new Promise(r=>{const d=document.createElement('dialog');
+d.innerHTML=`<form method=dialog><h3>${title}</h3>${fields.map(([k,l,t,o])=>`<label>${l}${t=='select'?`<select name=${k}>${opts(o,v[k])}</select>`:`<input name=${k} type="${t||'text'}" step=any value="${esc(v[k])}">`}</label>`).join('')}${extra}<div class=row><button value=x>Batal</button><button value=ok class=p>Simpan</button></div></form>`;
+document.body.append(d);d.showModal();
+d.onclose=()=>{let o=null;if(d.returnValue=='ok'){o={};new FormData(d.querySelector('form')).forEach((x,k)=>o[k]=x);fields.forEach(f=>f[2]=='number'&&(o[f[0]]=+o[f[0]]||0))}d.remove();r(o)}});
+document.addEventListener('click',e=>{if(e.target.id=='gps')navigator.geolocation.getCurrentPosition(p=>{const f=e.target.form;f.lat.value=p.coords.latitude;f.lng.value=p.coords.longitude},x=>alert(x.message))});
+
+/* LOGIN */
+function L(){view(`<div class=card style="max-width:360px;margin:10vh auto"><h2>Absensi</h2><input id=em type=email placeholder=Email><input id=pw type=password placeholder=Password><div class=row><button class=p id=li>Masuk</button><button id=su>Daftar</button></div><button id=go style="width:100%">Masuk dengan Google</button><p id=er class=err></p></div>`);
+const run=f=>f().catch(e=>$('#er').textContent=e.message);
+$('#li').onclick=()=>run(()=>signInWithEmailAndPassword(auth,$('#em').value,$('#pw').value));
+$('#su').onclick=()=>run(()=>createUserWithEmailAndPassword(auth,$('#em').value,$('#pw').value));
+$('#go').onclick=()=>run(()=>signInWithPopup(auth,new GoogleAuthProvider()))}
+
+onAuthStateChanged(auth,async u=>{
+if(!u){me=null;return L()}
+try{em=u.email.toLowerCase();let d=await getDoc(doc(db,'staff',em));
+if(!d.exists()){if((await list('staff',where('role','==','admin'))).length){view(bar()+`<div class=card>Akun <b>${esc(em)}</b> belum didaftarkan admin.</div>`);return}
+await setDoc(doc(db,'staff',em),{name:u.displayName||em,email:em,role:'admin',payType:'hour',rate:0});d=await getDoc(doc(db,'staff',em))}
+me=d.data();me.role=='admin'?adminUI():staffUI()}catch(e){view(bar()+`<div class="card err">${esc(e.message)}</div>`)}});
+
+/* STAFF */
+async function staffUI(){
+const [locs,shs,tasks,hist]=await Promise.all([list('locations'),list('shifts'),list('tasks',where('email','==',em)),list('attendance',where('email','==',em))]);
+hist.sort((a,b)=>(b.inAt||'').localeCompare(a.inAt||''));
+const open=hist.find(h=>h.inAt&&!h.outAt);
+view(bar()+`<div class=card><video id=v autoplay playsinline muted></video><canvas id=cv hidden></canvas>
+<label>Lokasi kerja<select id=lo>${opts(locs.map(l=>[l.id,l.name]),open?.locId||me.locId)}</select></label>
+<label>Shift<select id=sh>${opts(shs.map(s=>[s.id,`${s.name} (${s.start}-${s.end})`]),open?.shiftId||me.shiftId)}</select></label>
+<div class=row><button class=p id=bi ${open?'disabled':''}>Absen Datang</button><button id=bo ${open?'':'disabled'}>Absen Pulang</button></div><p id=st></p></div>
+<div class=card><b>Profil saya</b>${tbl(['Nama lengkap','No HP','NIK','Tempat, tgl lahir','Alamat','Posisi','Mulai kerja'],[[esc(me.name),esc(me.phone),esc(me.nik),esc([me.birthPlace,me.birthDate].filter(Boolean).join(', ')),esc(me.address),esc(me.position),me.startDate||'']])}</div>
+<div class=card><b>Tugas</b>${tasks.map(t=>`<label style="color:inherit"><input type=checkbox style="width:auto" data-k="${t.id}" ${t.done?'checked':''}> ${esc(t.text)}</label>`).join('')||'<p>Tidak ada tugas.</p>'}</div>
+<div class=card><b>Riwayat absen</b>${tbl(['Tanggal','Shift','Lokasi','Datang','Pulang','Jam'],hist.map(h=>[h.date,esc(h.shiftName),esc(h.locName),(h.inAt||'').slice(11),(h.outAt||'').slice(11),hrs(h).toFixed(1)]))}</div>`);
+navigator.mediaDevices?.getUserMedia({video:{facingMode:'user'}}).then(s=>$('#v').srcObject=s).catch(()=>$('#st').textContent='Kamera tidak bisa diakses');
+document.querySelectorAll('[data-k]').forEach(c=>c.onchange=()=>setDoc(doc(db,'tasks',c.dataset.k),{done:c.checked},{merge:true}));
+const act=async k=>{const st=$('#st');st.className='';try{
+st.textContent='Mengambil lokasi…';
+const p=await new Promise((a,b)=>navigator.geolocation.getCurrentPosition(a,b,{enableHighAccuracy:true,timeout:15000}));
+const l=locs.find(x=>x.id==$('#lo').value),sh=shs.find(x=>x.id==$('#sh').value);if(!l||!sh)throw Error('Pilih lokasi dan shift');
+const dist=Math.round(hav(p.coords.latitude,p.coords.longitude,l.lat,l.lng));
+if(dist>l.radius)throw Error(`Di luar radius: ${dist} m dari ${l.name} (maks ${l.radius} m)`);
+const v=$('#v'),cv=$('#cv');if(!v.videoWidth)throw Error('Kamera belum siap');
+cv.width=320;cv.height=v.videoHeight/v.videoWidth*320;cv.getContext('2d').drawImage(v,0,0,cv.width,cv.height);
+const photo=cv.toDataURL('image/jpeg',.5),now=nowL();
+if(k=='in')await setDoc(doc(db,'attendance',`${em}_${now.slice(0,10)}_${sh.id}`),{email:em,name:me.name,date:now.slice(0,10),shiftId:sh.id,shiftName:sh.name,locId:l.id,locName:l.name,inAt:now,inPhoto:photo,inDist:dist,outAt:''});
+else await setDoc(doc(db,'attendance',open.id),{outAt:now,outPhoto:photo,outDist:dist},{merge:true});
+staffUI()}catch(e){st.className='err';st.textContent=e.message}};
+$('#bi').onclick=()=>act('in');$('#bo').onclick=()=>act('out')}
+
+/* ADMIN */
+const TL={staff:'Staff',absensi:'Absensi',shifts:'Shift',locations:'Lokasi',positions:'Posisi',tasks:'Tugas',payroll:'Payroll'};
+async function adminUI(){
+view(bar()+`<div class=tabs>${Object.entries(TL).map(([k,l])=>`<button data-t=${k} class="${k==tab?'p':''}">${l}</button>`).join('')}</div><div id=main></div>`);
+document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;adminUI()});
+try{await TABS[tab]($('#main'))}catch(e){$('#main').innerHTML=`<p class=err>${esc(e.message)}</p>`}}
+
+async function manage(m,{c,t,f,rows,cols,head,id,pre,def={}}){
+m.insertAdjacentHTML('beforeend',`<p><button class=p id=ad>+ Tambah ${t}</button></p><div class=card>${tbl(head,rows.map(r=>[...cols(r),`<button data-e="${r.id}">Edit</button> <button data-d="${r.id}">Hapus</button>`]))}</div>`);
+const sv=async r=>{const o=await form(t,f,r||def,c=='locations'?'<button type=button id=gps>Isi dari GPS saya</button>':'');if(!o)return;pre&&pre(o,r);
+await setDoc(doc(db,c,id?id(o,r):(r?r.id:doc(collection(db,c)).id)),o,{merge:true});adminUI()};
+m.querySelector('#ad').onclick=()=>sv();
+m.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>sv(rows.find(r=>r.id==b.dataset.e)));
+m.querySelectorAll('[data-d]').forEach(b=>b.onclick=async()=>{if(confirm('Hapus data ini?')){await deleteDoc(doc(db,c,b.dataset.d));adminUI()}})}
+
+const PT=[['hour','Per jam'],['day','Per hari'],['shift','Per shift']];
+const TABS={
+async staff(m){const [rows,pos,sh,lo]=await Promise.all([list('staff'),list('positions'),list('shifts'),list('locations')]);
+const nm=(a,i)=>esc(a.find(x=>x.id==i)?.name);
+await manage(m,{c:'staff',t:'Staff',head:['Nama lengkap','No HP','Email','NIK','Tempat, tgl lahir','Alamat','Posisi','Lokasi','Shift','Mulai kerja','Role','Gaji','Tipe',''],rows,
+f:[['name','Nama lengkap'],['phone','No HP','tel'],['email','Email','email'],['nik','NIK'],['gender','Jenis kelamin','select',[['','-'],['L','Laki-laki'],['P','Perempuan']]],['birthPlace','Tempat lahir'],['birthDate','Tanggal lahir','date'],['address','Alamat tempat tinggal'],['emergency','Kontak darurat (nama & no HP)'],['startDate','Mulai bekerja','date'],['role','Role','select',[['staff','Staff'],['admin','Admin']]],['position','Posisi','select',[['','-'],...pos.map(p=>[p.name,p.name])]],['locId','Lokasi kerja','select',[['','-'],...lo.map(l=>[l.id,l.name])]],['shiftId','Shift utama','select',[['','-'],...sh.map(s=>[s.id,s.name])]],['payType','Tipe gaji','select',PT],['rate','Gaji (Rp)','number']],
+cols:r=>[esc(r.name),esc(r.phone),esc(r.email),esc(r.nik),esc([r.birthPlace,r.birthDate].filter(Boolean).join(', ')),esc(r.address),esc(r.position),nm(lo,r.locId),nm(sh,r.shiftId),r.startDate||'',r.role,fr(r.rate||0),(PT.find(x=>x[0]==r.payType)||[])[1]||''],
+id:(o,r)=>r?r.id:o.email.toLowerCase(),pre:(o,r)=>{if(!r)o.email=o.email.toLowerCase()},def:{role:'staff',payType:'hour'}})},
+async absensi(m){const [st,sh,all]=await Promise.all([list('staff'),list('shifts'),list('attendance')]);
+m.innerHTML=`<select id=fs><option value="">Semua staff</option>${opts(st.map(s=>[s.email,s.name]),FS)}</select>`;
+$('#fs').onchange=e=>{FS=e.target.value;adminUI()};
+const rows=all.filter(a=>!FS||a.email==FS).sort((a,b)=>(b.inAt||'').localeCompare(a.inAt||'')).slice(0,200);
+const img=s=>s?`<img class=t src="${s}">`:'';
+await manage(m,{c:'attendance',t:'Absensi',head:['Tanggal','Nama','Shift','Lokasi','Datang','Pulang','Jam','Foto',''],rows,
+f:[['email','Staff','select',st.map(s=>[s.email,s.name])],['shiftId','Shift','select',sh.map(s=>[s.id,s.name])],['inAt','Datang','datetime-local'],['outAt','Pulang','datetime-local']],
+cols:r=>[r.date,esc(r.name),esc(r.shiftName),esc(r.locName),(r.inAt||'').slice(11),(r.outAt||'').slice(11),hrs(r).toFixed(1),img(r.inPhoto)+img(r.outPhoto)],
+id:(o,r)=>r?r.id:`${o.email}_${o.inAt.slice(0,10)}_${o.shiftId}`,
+pre:o=>{o.date=o.inAt.slice(0,10);o.name=st.find(s=>s.email==o.email)?.name;o.shiftName=sh.find(s=>s.id==o.shiftId)?.name},def:{inAt:nowL()}})},
+async shifts(m){const rows=await list('shifts');await manage(m,{c:'shifts',t:'Shift',head:['Nama','Mulai','Selesai',''],rows,f:[['name','Nama shift'],['start','Jam mulai','time'],['end','Jam selesai','time']],cols:r=>[esc(r.name),r.start,r.end]})},
+async locations(m){const rows=await list('locations');await manage(m,{c:'locations',t:'Lokasi',head:['Nama','Lat','Lng','Radius (m)',''],rows,f:[['name','Nama lokasi'],['lat','Latitude','number'],['lng','Longitude','number'],['radius','Radius (meter)','number']],cols:r=>[esc(r.name),r.lat,r.lng,r.radius],def:{radius:100}})},
+async positions(m){const rows=await list('positions');await manage(m,{c:'positions',t:'Posisi',head:['Posisi',''],rows,f:[['name','Nama posisi']],cols:r=>[esc(r.name)]})},
+async tasks(m){const st=await list('staff');FS=FS||st[0]?.email||'';
+m.innerHTML=`<select id=fs>${opts(st.map(s=>[s.email,s.name]),FS)}</select>`;$('#fs').onchange=e=>{FS=e.target.value;adminUI()};
+const rows=await list('tasks',where('email','==',FS));
+await manage(m,{c:'tasks',t:'Tugas',head:['Selesai','Tugas',''],rows,f:[['text','Tugas']],cols:r=>[r.done?'✓':'',esc(r.text)],pre:(o,r)=>{o.email=FS;if(!r)o.done=false}})},
+async payroll(m){const cfg=(await getDoc(doc(db,'settings','payroll'))).data()||{cutoff:25},co=cfg.cutoff;
+PM=PM||nowL().slice(0,7);const [y,mm]=PM.split('-').map(Number);
+const end=(Y,M)=>new Date(Y,M,Math.min(co,new Date(Y,M+1,0).getDate()));
+const e=end(y,mm-1),s=new Date(end(y,mm-2).getTime()+864e5),S=fmtD(s),E=fmtD(e);
+const [st,att,adj]=await Promise.all([list('staff'),list('attendance'),list('adjust')]);
+const rows=st.map(p=>{const a=att.filter(x=>x.email==p.email&&x.date>=S&&x.date<=E&&x.outAt),h=a.reduce((n,x)=>n+hrs(x),0),d=new Set(a.map(x=>x.date)).size;
+const base=(p.payType=='day'?d:p.payType=='shift'?a.length:h)*(p.rate||0),aj=adj.find(x=>x.id==PM+'_'+p.email)||{amt:0};
+return {p,h,d,n:a.length,base,aj,tot:base+(aj.amt||0)}});
+m.innerHTML=`<div class=card><div class=row><label>Bulan payroll<input type=month id=pm value="${PM}"></label><label>Tanggal cut off<input type=number id=co min=1 max=31 value="${co}"></label><button id=sc>Simpan cut off</button></div><p>Periode: <b>${S}</b> s/d <b>${E}</b></p>
+${tbl(['Nama','Jam','Hari','Shift','Gaji dasar','Penyesuaian','Total',''],rows.map(r=>[esc(r.p.name),r.h.toFixed(1),r.d,r.n,fr(r.base),fr(r.aj.amt||0)+(r.aj.note?' ('+esc(r.aj.note)+')':''),'<b>'+fr(r.tot)+'</b>',`<button data-a="${esc(r.p.email)}">Edit</button>`]))}</div>`;
+$('#pm').onchange=x=>{PM=x.target.value;adminUI()};
+$('#sc').onclick=async()=>{await setDoc(doc(db,'settings','payroll'),{cutoff:+$('#co').value||25});adminUI()};
+m.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const k=PM+'_'+b.dataset.a,o=await form('Penyesuaian payroll',[['amt','Bonus (+) / potongan (-) Rp','number'],['note','Catatan']],adj.find(x=>x.id==k)||{});
+if(o){await setDoc(doc(db,'adjust',k),{...o,period:PM,email:b.dataset.a});adminUI()}})}
+};
+</script></body></html>
