@@ -11,3 +11,7 @@ export const firebaseConfig = {
 };
 // Login cukup mengetik "admin" atau "kasir1"; aplikasi menambahkan domain ini menjadi email.
 export const emailDomain = "parfumsarjana.app";
+
+// Satu-satunya admin: login dengan akun Google ini (tombol "Masuk dengan Google" di halaman login).
+// Harus sama persis dengan email di firestore.rules.
+export const adminEmail = "samdhiwani123@gmail.com";

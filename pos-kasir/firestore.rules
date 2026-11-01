@@ -4,13 +4,19 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
     function role() { return userDoc().data.role; }
-    // Staff = akun yang terdaftar di koleksi users dan tidak dinonaktifkan.
-    function isStaff() {
+    // Admin = satu-satunya akun Google ini (email harus terverifikasi). Role "admin" di koleksi users TIDAK lagi berlaku.
+    function isAdmin() {
       return signedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && userDoc().data.get('active', true) != false;
+        && request.auth.token.email == 'samdhiwani123@gmail.com'
+        && request.auth.token.email_verified == true;
     }
-    function isAdmin() { return isStaff() && role() == 'admin'; }
+    // Staff = admin Google, atau akun di koleksi users (bukan role admin lama) yang tidak dinonaktifkan.
+    function isStaff() {
+      return isAdmin() || (signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc().data.get('active', true) != false
+        && userDoc().data.role != 'admin');
+    }
     // Hak akses role kustom disimpan di meta/roles (map: roleId -> {name, perms}). Admin selalu lolos.
     function can(p) {
       return isAdmin() || (isStaff()
@@ -37,7 +43,9 @@ service cloud.firestore {
     match /products/{id} {
       allow read: if isStaff();
       allow create, delete: if can('produk_kelola');
-      allow update: if can('produk_kelola') || (isStaff() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']));
+      allow update: if can('produk_kelola')
+        || (isStaff() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']))
+        || (can('kategori_kelola') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['category']));
     }
 
     match /members/{id} {

@@ -23,7 +23,7 @@ nav button[aria-current="true"], .chip[aria-pressed="true"], header nav button[a
 main { padding: 20px; max-width: 1400px; margin: 0 auto; }
 
 .pos { display: grid; grid-template-columns: 1fr 380px; gap: 20px; align-items: start; }
-@media(max-width: 900px) { .pos { grid-template-columns: 1fr; } }
+
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,.05); }
 
 input, select, textarea { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; width: 100%; transition: border-color .2s; }
@@ -105,6 +105,102 @@ dialog::backdrop { background: rgba(0,0,0,.6); backdrop-filter: blur(2px); }
 .rcpt .row { align-items: flex-start; padding: 3px 0; }
 .rc-box { background: #fff; color: #000; border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
 .rc-box .rc-sub, .rc-box .rc-meta, .rc-box .rc-foot { color: #444; }
+
+/* ===== Header & navigasi ===== */
+header { position: sticky; top: 0; z-index: 50; gap: 10px 14px; padding: 10px 20px; padding-top: calc(10px + env(safe-area-inset-top, 0px)); align-items: center; }
+header .brand { margin-right: 4px; white-space: nowrap; }
+header nav { flex: 1; min-width: 0; }
+header .hdr-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+header .hdr-right .tag { background: #222; color: #fff; white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+header .chip { padding: 7px 14px; white-space: nowrap; }
+nav button .ic { display: none; }
+.chips { -webkit-overflow-scrolling: touch; }
+.seg button, .chip, .btn, nav button { touch-action: manipulation; }
+.hdr-user { display: inline; }
+#mbar { display: none; }
+
+/* ===== Tablet (<= 1024px) ===== */
+@media (max-width: 1024px) {
+  main { padding: 16px; }
+  .pos { grid-template-columns: 1fr !important; gap: 16px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  header { padding-left: 16px; padding-right: 16px; }
+  header nav button { padding: 8px 12px; }
+  .panel { padding: 16px; }
+  #items-section { max-height: none !important; }
+}
+
+/* ===== Smartphone (<= 720px) ===== */
+@media (max-width: 720px) {
+  body { font-size: 14px; padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+  body.login-mode { padding-bottom: 0; }
+  main { padding: 12px; }
+  header { padding: 8px 12px; padding-top: calc(8px + env(safe-area-inset-top, 0px)); flex-wrap: nowrap; }
+  header .brand { font-size: 15px; margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  header .hdr-right { gap: 6px; }
+  header .hdr-right .tag { font-size: 10px; max-width: 110px; padding: 4px 8px; }
+  header .chip { padding: 6px 10px; font-size: 13px; }
+  .hdr-user { display: none; }
+  header nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; flex: none; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0;
+    background: #000; border-top: 1px solid #333; padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0px)); }
+  header nav button { border: 0; border-radius: 10px; padding: 6px 2px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; font-weight: 700; min-height: 50px; color: #9ca3af; }
+  header nav button .ic { display: block; font-size: 19px; line-height: 1; }
+  header nav button[aria-current="true"] { background: transparent; color: var(--acc); border: 0; }
+
+  h2 { font-size: 18px; margin-bottom: 12px; }
+  .panel { padding: 14px; border-radius: 12px; }
+  input, select, textarea { font-size: 16px; padding: 11px 12px; }
+  #mq { font-size: 16px !important; padding: 10px !important; }
+  .btn { padding: 11px 14px; min-height: 42px; }
+  .btn.sm { padding: 8px 12px; min-height: 36px; }
+  .form-row { flex-direction: column; gap: 0; }
+  .form-row > * { min-width: 0; margin-bottom: 12px; }
+  .toolbar { gap: 8px; }
+  .toolbar > .btn { flex: 1 1 calc(50% - 8px); }
+  .toolbar > input[type=search], .toolbar > input[type=text] { flex: 1 1 100%; min-width: 0; }
+
+  .chips { flex-wrap: nowrap; overflow-x: auto; margin-left: -2px; padding: 2px 2px 8px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips .chip { flex: 0 0 auto; padding: 8px 14px; }
+  #pmethods, #quick-cash { flex-wrap: wrap; overflow: visible; }
+  #pmethods .chip { flex: 1 1 calc(50% - 8px); text-align: center; }
+  .seg button { padding: 9px 12px; }
+
+  .grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .item { padding: 12px; min-height: 100px; }
+  .item b { font-size: 14px; }
+  .prow { gap: 8px; padding: 10px; }
+  .prow .plus { width: 34px; height: 34px; }
+  .qty button { width: 38px; height: 38px; }
+
+  .stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat { padding: 12px; }
+  .stat b { font-size: 18px; }
+  th, td { padding: 10px 8px; font-size: 13px; }
+  .pager { justify-content: center; }
+  .pager > span { width: 100%; text-align: center; }
+  .pager div { width: 100%; justify-content: space-between; }
+
+  dialog { width: 100%; max-width: 100% !important; margin: auto 0 0 0; border-radius: 18px 18px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); max-height: 92vh; }
+  dialog.wide { max-width: 100% !important; }
+  .dlg-actions { position: sticky; bottom: -2px; background: var(--panel); padding-top: 12px; flex-wrap: nowrap; }
+  .dlg-actions .btn { flex: 1; }
+  #toast { left: 12px; right: 12px; transform: none; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); text-align: center; }
+
+  #mbar { display: flex; align-items: center; gap: 10px; position: fixed; left: 8px; right: 8px; z-index: 55; bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+    background: #111; color: #fff; border-radius: 14px; padding: 8px 8px 8px 14px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+  #mbar .mi { flex: 1; min-width: 0; line-height: 1.25; }
+  #mbar .mi small { display: block; color: #9ca3af; font-size: 11px; }
+  #mbar .mi b { font-size: 16px; }
+  #mbar .btn { padding: 10px 16px; }
+  body:has(#mbar) { padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px)); }
+  .login-wrap { margin: 6vh auto 0 !important; }
+}
+@media (max-width: 380px) {
+  .grid { gap: 8px; }
+  header .brand { font-size: 14px; }
+  header nav button { font-size: 10px; }
+}
 </style>
 </head>
 <body class="login-mode">
@@ -112,6 +208,7 @@ dialog::backdrop { background: rgba(0,0,0,.6); backdrop-filter: blur(2px); }
 <header id="main-header" style="display:none">
   <span class="brand">PARFUM SARJANA</span>
   <nav id="nav" aria-label="Menu utama"></nav>
+  <div class="hdr-right" id="hdr-right"></div>
 </header>
 
 <main>
@@ -124,9 +221,9 @@ dialog::backdrop { background: rgba(0,0,0,.6); backdrop-filter: blur(2px); }
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { getFirestore, doc, getDoc as fsGetDoc, getDocs, setDoc, deleteDoc, collection, query, where, orderBy, limit, onSnapshot, writeBatch, increment, Timestamp, documentId, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-import { firebaseConfig, emailDomain } from "./config.js";
+import { firebaseConfig, emailDomain, adminEmail } from "./config.js";
 
 const app = initializeApp(firebaseConfig), db = getFirestore(app), auth = getAuth(app);
 
@@ -189,7 +286,7 @@ const S = {
   pg: {}, cur: null, imp: null
 };
 const can = p => S.admin || !!(S.me && S.roles[S.me.role] && S.roles[S.me.role].perms && S.roles[S.me.role].perms[p]);
-const roleName = id => id === "admin" ? "Admin" : ((S.roles[id] && S.roles[id].name) || id);
+const roleName = id => id === "admin" ? "Admin lama" : ((S.roles[id] && S.roles[id].name) || id);
 const bkOf = s => s.bk || (S.branches.find(b => b.name === s.branch) || {}).key || LEGACY_BR[s.branch];
 
 const getCol = c => collection(db, c);
@@ -203,7 +300,12 @@ const dd = (t, by, sg, total, n, method, items) => ({
   methods: { [method]: increment(sg * total) },
   prod: Object.fromEntries(items.map(i => [i.id, { n: i.name, c: i.c || "", q: increment(sg * i.q), r: increment(sg * i.price * i.q) }]))
 });
+const isOwner = u => !!u && !!u.email && u.email.toLowerCase() === String(adminEmail).toLowerCase() && u.emailVerified === true;
 const ERR = {
+  "auth/popup-closed-by-user": "Login Google dibatalkan",
+  "auth/cancelled-popup-request": "Login Google dibatalkan",
+  "auth/unauthorized-domain": "Domain ini belum diizinkan di Firebase (Authentication → Settings → Authorized domains)",
+  "auth/operation-not-allowed": "Login Google belum diaktifkan di Firebase Console",
   "permission-denied": "Anda tidak punya izin untuk tindakan ini",
   "auth/invalid-credential": "Username atau password salah",
   "auth/invalid-email": "Username tidak valid",
@@ -256,16 +358,25 @@ function subscribeData() {
   sub(doc(db, "meta", "qris"), snap => { S.qris = (snap.exists() && snap.data().data) || ""; live(); });
 }
 
+// Cache seluruh pelanggan agar bisa dicari bebas (nama mana pun / potongan nomor HP, mis. 4 digit akhir).
+let memCache = null, memAt = 0;
+const memInval = () => { memAt = 0; };
+async function allMembers() {
+  if (memCache && Date.now() - memAt < 120000) return memCache;
+  const s = await getDocs(getCol("members"));
+  memCache = s.docs.map(d => ({ id: d.id, ...d.data() }));
+  memAt = Date.now();
+  return memCache;
+}
 async function findMembers(q) {
-  const t = q.trim().toLowerCase(), dg = t.replace(/\D/g, ""), out = new Map(), jobs = [];
-  const mc = getCol("members");
-  if (!t) jobs.push(getDocs(query(mc, orderBy("nameLower"), limit(300))));
-  else {
-    jobs.push(getDocs(query(mc, where("nameLower", ">=", t), where("nameLower", "<=", t + "\uf8ff"), limit(100))));
-    if (dg.length >= 3) jobs.push(getDocs(query(mc, where(documentId(), ">=", dg), where(documentId(), "<=", dg + "\uf8ff"), limit(100))));
-  }
-  (await Promise.all(jobs)).forEach(s => s.docs.forEach(d => out.set(d.id, {id: d.id, ...d.data()})));
-  return [...out.values()].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  const all = await allMembers();
+  const tokens = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const byName = (a, b) => String(a.name).localeCompare(String(b.name));
+  if (!tokens.length) return all.slice().sort(byName).slice(0, 300);
+  return all.filter(m => {
+    const name = String(m.name || "").toLowerCase(), phone = String(m.phone || m.id || "").replace(/\D/g, "");
+    return tokens.every(t => name.includes(t) || (/^\d+$/.test(t) && phone.includes(t)));
+  }).sort(byName);
 }
 
 async function loadData() {
@@ -320,7 +431,8 @@ function allowedTabs() {
 function nav() {
   if (!S.me) return;
   const tabs = allowedTabs();
-  $("#nav").innerHTML = tabs.map(([k, l]) => `<button data-tab="${k}" aria-current="${S.tab === k}">${l}</button>`).join("");
+  const IC = { kasir: "🛒", pelanggan: "👥", laporan: "📊", riwayat: "🧾", pengaturan: "⚙️" };
+  $("#nav").innerHTML = tabs.map(([k, l]) => `<button data-tab="${k}" aria-current="${S.tab === k}"><span class="ic" aria-hidden="true">${IC[k] || "•"}</span><span class="lb">${l}</span></button>`).join("");
 }
 function view() {
   const routers = { kasir: vKasir, pelanggan: vPelanggan, laporan: vLaporan, riwayat: vRiwayat, pengaturan: vPengaturan };
@@ -443,7 +555,8 @@ function vKasir() {
           <button class="btn pri" id="mkorder" style="width:100%; padding:14px; font-size:16px">Buat Pesanan</button>
         </div>
       </aside>
-    </div>`;
+    </div>
+    <div id="mbar"><div class="mi"><small id="mbar-n">Keranjang kosong</small><b id="mbar-t">Rp 0</b></div><button class="btn pri" data-mk="1">Buat Pesanan</button></div>`;
   renderCats(); renderGrid(); renderCart();
 }
 function renderCats() {
@@ -482,6 +595,7 @@ function renderCart() {
     </div>`).join("") : `<div class="empty">Keranjang kosong.</div>`;
   $("#sub").textContent = rp(d.sub);
   $("#total").textContent = rp(d.total);
+  const mn = $("#mbar-n"); if (mn) { const n = d.lines.reduce((a, l) => a + l.qty, 0); mn.textContent = n ? n + " item di keranjang" : "Keranjang kosong"; $("#mbar-t").textContent = rp(d.total); }
 }
 
 // ---------- POPUP PEMBAYARAN ----------
@@ -547,7 +661,7 @@ function renderMemberSelection() {
   el.innerHTML = `<div style="margin-bottom:16px; background:var(--soft); padding:12px; border-radius:8px; border:1px solid var(--line)">
       <div class="row" style="margin-bottom:8px"><label style="margin:0">Pelanggan (opsional)</label>
         <button class="btn sm" data-newmem="1" style="border:none; font-weight:800; padding:0">+ Baru</button></div>
-      <input id="mq" placeholder="Cari nama atau WA..." autocomplete="off" style="font-size:13px; padding:8px">
+      <input id="mq" placeholder="Cari nama atau no. HP (4 digit akhir juga bisa)" autocomplete="off" style="font-size:13px; padding:8px">
       <div id="mres"></div></div>`;
   renderMRes();
 }
@@ -583,7 +697,7 @@ function openNewMember(after) {
       const ref = getDoc("members", phone), ex = await fsGetDoc(ref);
       let m;
       if (ex.exists()) { m = { id: phone, ...ex.data() }; toast("Nomor sudah terdaftar atas nama " + ex.data().name); }
-      else { await setDoc(ref, { name, nameLower: name.toLowerCase(), phone }); m = { id: phone, name, phone }; toast("Pelanggan disimpan"); }
+      else { await setDoc(ref, { name, nameLower: name.toLowerCase(), phone }); memInval(); m = { id: phone, name, phone }; toast("Pelanggan disimpan"); }
       $("#dlg2").close(); after(m);
     } catch(e) { toast("Gagal: " + errMsg(e)); }
   };
@@ -609,7 +723,7 @@ async function processCheckout() {
       b.set(getDoc("members", m.id), { spend: increment(d.total), visits: increment(1) }, { merge: true });
       b.set(doc(db, "members", m.id, "purchases", saleId), sale);
     }
-    await b.commit();
+    await b.commit(); memInval();
     S.cart = {}; S.disc = 0; S.paid = ""; S.member = null; S.mres = []; S.q = ""; S.method = "Tunai";
     showNota({ id: saleId, ...sale, ts: now });
     vKasir();
@@ -634,7 +748,7 @@ function voidSale(id) {
       b.set(doc(db, "branches", bk, "daily", s.day + "_" + by), dd(s.ts, by, -1, s.total, n, s.method, items), { merge: true });
       if (s.member) {
         b.set(getDoc("members", s.member.id), { spend: increment(-s.total), visits: increment(-1) }, { merge: true });
-        b.delete(doc(db, "members", s.member.id, "purchases", id));
+        b.delete(doc(db, "members", s.member.id, "purchases", id)); memInval();
       }
       await b.commit(); $("#dlg").close(); toast("Transaksi dibatalkan"); loadData();
     } catch(e) { toast("Gagal membatalkan: " + errMsg(e)); }
@@ -653,7 +767,7 @@ function vPelanggan() {
         <button class="btn pri" data-newmemtab="1">+ Pelanggan Baru</button>
       </div>
       <div class="form-group" style="max-width:400px">
-        <input type="search" id="p-search" placeholder="Cari awalan nama atau nomor HP..." value="${esc(S.pSearch)}">
+        <input type="search" id="p-search" placeholder="Cari nama atau no. HP (mis. 4 digit terakhir)" value="${esc(S.pSearch)}">
       </div>
       <div class="wrap"><table>
         <thead><tr><th>Nama</th><th>No. WhatsApp</th><th class="n">Belanja</th></tr></thead>
@@ -752,7 +866,7 @@ async function saveMember(id) {
   const name = $("#fm-name").value.trim();
   if (!name) return toast("Nama wajib diisi");
   try {
-    await setDoc(getDoc("members", id), { name, nameLower: name.toLowerCase() }, { merge: true });
+    await setDoc(getDoc("members", id), { name, nameLower: name.toLowerCase() }, { merge: true }); memInval();
     if (S.viewMember && S.viewMember.id === id) S.viewMember.name = name;
     toast("Tersimpan"); $("#dlg").close();
     S.members = await findMembers(S.pSearch); view();
@@ -761,7 +875,7 @@ async function saveMember(id) {
 function delMember(id) {
   customConfirm("Hapus pelanggan ini? Riwayat belanjanya tidak akan tampil lagi.", async () => {
     try {
-      await deleteDoc(getDoc("members", id)); $("#dlg").close(); toast("Dihapus");
+      await deleteDoc(getDoc("members", id)); memInval(); $("#dlg").close(); toast("Dihapus");
       S.viewMember = null; S.members = await findMembers(S.pSearch); view();
     } catch(e) { toast("Gagal: " + errMsg(e)); }
   });
@@ -1133,16 +1247,42 @@ function rSetKategori() {
       <div class="row" style="margin-bottom:16px"><h3 style="margin:0">Manajemen Kategori</h3><button class="btn pri" data-newcat="1">+ Tambah Kategori</button></div>
       ${S.cats.length ? S.cats.map(c => `
         <div class="row" style="padding:12px; border:1px solid var(--line); border-radius:8px; margin-bottom:8px">
-          <b>${esc(c.id)}</b><button class="btn sm del" data-delcat="${esc(c.id)}">Hapus</button></div>`).join("") : `<div class="empty">Belum ada kategori.</div>`}
+          <div style="min-width:0"><b style="word-break:break-word">${esc(c.id)}</b><br><small style="color:var(--mute)">${S.products.filter(p => p.category === c.id).length} produk</small></div>
+          <div style="display:flex; gap:6px; flex-shrink:0"><button class="btn sm" data-editcat="${esc(c.id)}">Edit</button><button class="btn sm del" data-delcat="${esc(c.id)}">Hapus</button></div></div>`).join("") : `<div class="empty">Belum ada kategori.</div>`}
     </div>`;
 }
-function openCatForm() {
-  modal(`<h2>Tambah Kategori</h2><div class="form-group"><label>Nama Kategori</label><input id="fc-name" maxlength="40"></div>
-    <div class="dlg-actions"><button class="btn" data-close="1">Batal</button><button class="btn pri" id="fc-add">Tambah</button></div>`);
+function openCatForm(old = "") {
+  const n = old ? S.products.filter(p => p.category === old).length : 0;
+  modal(`<h2>${old ? "Edit Kategori" : "Tambah Kategori"}</h2><div class="form-group"><label>Nama Kategori</label><input id="fc-name" maxlength="40" value="${esc(old)}"></div>
+    ${old ? `<p style="color:var(--mute); font-size:13px; margin:-4px 0 0">${n} produk dengan kategori ini akan ikut berpindah ke nama baru. Riwayat laporan lama tetap memakai nama lama.</p>` : ""}
+    <div class="dlg-actions"><button class="btn" data-close="1">Batal</button><button class="btn pri" id="fc-add" data-old="${esc(old)}">${old ? "Simpan" : "Tambah"}</button></div>`);
+  setTimeout(() => { const i = $("#fc-name"); if (i) { i.focus(); i.select(); } }, 50);
 }
-async function saveKategori() {
+async function renameKategori(old, id) {
+  if (id === old) { $("#dlg").close(); return; }
+  if (S.cats.some(c => c.id.toLowerCase() === id.toLowerCase() && c.id !== old)) return toast("Nama kategori sudah ada");
+  const btn = $("#fc-add"); if (btn) { btn.disabled = true; btn.textContent = "Menyimpan..."; }
+  try {
+    const inUse = S.products.filter(p => p.category === old);
+    for (let i = 0; i < inUse.length; i += 450) {
+      const b = writeBatch(db);
+      inUse.slice(i, i + 450).forEach(p => b.update(getDoc("products", p.id), { category: id }));
+      await b.commit();
+    }
+    const list = S.cats.map(c => c.id === old ? id : c.id);
+    await setDoc(doc(db, "meta", "categories"), { list }, { merge: true });
+    if (S.pfCat === old) S.pfCat = id;
+    if (S.cat === old) S.cat = id;
+    if (S.rC === old) S.rC = id;
+    if (S.fCat === old) S.fCat = id;
+    $("#dlg").close(); toast("Kategori diperbarui"); view();
+  } catch(e) { toast("Gagal: " + errMsg(e)); if (btn) { btn.disabled = false; btn.textContent = "Simpan"; } }
+}
+async function saveKategori(old = "") {
   const id = $("#fc-name").value.trim();
   if (!id || id.length > 40) return toast("Nama kategori wajib diisi (maks. 40 huruf)");
+  if (old) return renameKategori(old, id);
+  if (S.cats.some(c => c.id.toLowerCase() === id.toLowerCase())) return toast("Nama kategori sudah ada");
   try { await setDoc(doc(db, "meta", "categories"), { list: arrayUnion(id) }, { merge: true }); $("#dlg").close(); toast("Ditambahkan"); view(); }
   catch(e) { toast("Gagal: " + errMsg(e)); }
 }
@@ -1204,7 +1344,7 @@ function rSetRole() {
     <div class="panel" style="max-width:800px">
       <div class="row" style="margin-bottom:16px"><h3 style="margin:0">Role & Hak Akses</h3><button class="btn pri" data-newrole="1">+ Tambah Role</button></div>
       <div class="wrap"><table><thead><tr><th>Role</th><th>Akses Aktif</th><th>Aksi</th></tr></thead><tbody>
-        <tr><td><b>Admin</b> <span class="tag">bawaan</span></td><td>Semua akses (tidak dapat diubah)</td><td></td></tr>
+        <tr><td><b>Admin</b> <span class="tag">Google</span></td><td>Semua akses · hanya akun Google ${esc(adminEmail)}</td><td></td></tr>
         ${rows.map(([id, r]) => `<tr><td><b>${esc(r.name)}</b><br><small style="color:var(--mute)">${esc(id)}</small></td>
           <td>${PERMS.filter(([k]) => r.perms && r.perms[k]).map(([, l]) => esc(l)).join(", ") || "<i>Tidak ada</i>"}</td>
           <td><button class="btn sm" data-editrole="${esc(id)}">Edit</button></td></tr>`).join("")}
@@ -1249,7 +1389,7 @@ function rSetStaff() {
         <thead><tr><th>Username</th><th>Nama</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead>
         <tbody>
           ${items.map(s => { const me = s.id === S.me.uid; return `
-            <tr><td><b>${esc(s.username)}</b>${me ? " (Anda)" : ""}</td><td>${esc(s.nama || "-")}</td>
+            <tr><td><b>${esc(s.username)}</b>${me ? " (Anda)" : ""}${s.role === "admin" ? ' <span class="tag bad">tidak berlaku</span>' : ""}</td><td>${esc(s.nama || "-")}</td>
               <td><span class="tag" style="background:${s.role === "admin" ? "var(--acc)" : "var(--soft)"}">${esc(roleName(s.role))}</span></td>
               <td>${s.active === false ? "Nonaktif" : "Aktif"}</td>
               <td><button class="btn sm" data-editstaff="${esc(s.id)}">Edit</button>${me ? "" : ` <button class="btn sm del" data-delstaff="${esc(s.id)}">Hapus</button>`}</td></tr>`; }).join("") || `<tr><td colspan="5" class="empty">Memuat…</td></tr>`}
@@ -1259,7 +1399,7 @@ function rSetStaff() {
     </div>`;
 }
 function roleOptions(sel) {
-  return [["admin", "Admin"], ...Object.entries(S.roles).map(([k, r]) => [k, r.name])].map(([k, n]) => `<option value="${esc(k)}" ${sel === k ? "selected" : ""}>${esc(n)}</option>`).join("");
+  return [...(sel === "admin" ? [["admin", "Admin lama (tidak berlaku)"]] : []), ...Object.entries(S.roles).map(([k, r]) => [k, r.name])].map(([k, n]) => `<option value="${esc(k)}" ${sel === k ? "selected" : ""}>${esc(n)}</option>`).join("");
 }
 function openStaffForm(id) {
   const s = id ? S.staff.find(x => x.id === id) : { username: "", nama: "", role: "kasir", active: true };
@@ -1276,7 +1416,7 @@ function openStaffForm(id) {
 async function saveStaff(id) {
   const nama = $("#fs-nama").value.trim(), role = $("#fs-role").value;
   if (id) {
-    const patch = { nama }; if (id !== S.me.uid) { patch.role = role; patch.active = $("#fs-active").checked; }
+    const patch = { nama }; if (id !== S.me.uid && role !== "admin") { patch.role = role; patch.active = $("#fs-active").checked; }
     try { await setDoc(getDoc("users", id), patch, { merge: true }); $("#dlg").close(); toast("Akun diperbarui"); loadStaff(); }
     catch(e) { toast("Gagal: " + errMsg(e)); }
     return;
@@ -1401,7 +1541,7 @@ document.addEventListener("click", e => {
   else if (d.m) { S.method = d.m; renderPay(); }
   else if (d.q) { S.paid = d.q; $("#paid").value = d.q; updateChange(getCartData().total); }
   else if (t.id === "clr") { S.cart = {}; S.disc = 0; S.paid = ""; S.member = null; S.mres = []; renderCart(); }
-  else if (t.id === "mkorder") openPayment();
+  else if (t.id === "mkorder" || d.mk) openPayment();
   else if (t.id === "pay") processCheckout();
 
   // Pelanggan di popup pembayaran
@@ -1431,8 +1571,9 @@ document.addEventListener("click", e => {
   else if (t.id === "imp-go") runImport();
 
   // Kategori
-  else if (d.newcat) openCatForm();
-  else if (t.id === "fc-add") saveKategori();
+  else if (d.newcat) openCatForm("");
+  else if (t.id === "fc-add") saveKategori(d.old || "");
+  else if (d.editcat) openCatForm(d.editcat);
   else if (d.delcat) delKategori(d.delcat);
 
   // Cabang & role
@@ -1485,6 +1626,7 @@ document.addEventListener("input", e => {
   else if (id === "pf-q") { S.pfQ = el.value; S.pg.sprod = 1; renderProdTable(); }
   else if (id.startsWith("rc-")) updRcPrev();
 });
+document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "fc-name") { e.preventDefault(); $("#fc-add").click(); } });
 document.addEventListener("change", e => {
   if (e.target.id === "imp-file" && e.target.files[0]) parseImport(e.target.files[0]);
   else if (e.target.id === "qr-file" && e.target.files[0]) uploadQris(e.target.files[0]);
@@ -1498,11 +1640,15 @@ function showLogin(msg = "") {
   $("#main-header").style.display = "none";
   const eMsg = msg ? `<div style="color:var(--warn); margin-bottom:16px; padding:10px; background:rgba(234,88,12,.1); border-radius:8px; border:1px solid rgba(234,88,12,.3)">${esc(msg)}</div>` : "";
   $("#view").innerHTML = `
-    <div style="max-width:380px; margin:10vh auto; text-align:center">
+    <div class="login-wrap" style="max-width:380px; margin:10vh auto; text-align:center">
       <h1 style="font-weight:800; font-size:28px; margin-bottom:4px; letter-spacing:-1px">PARFUM SARJANA</h1>
-      <p style="color:var(--mute); margin-bottom:32px">Point of Sale (POS)</p>
+      <p style="color:var(--mute); margin-bottom:28px">Point of Sale (POS)</p>
       <div class="panel" style="text-align:left">
         ${eMsg}
+        <button class="btn" id="lgg" style="width:100%; padding:13px; font-size:15px; background:#fff; color:#111; border-color:#fff; margin-bottom:6px">
+          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.5 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.2 5.5-4.7 7.2l7.6 5.9c4.4-4.1 6.9-10.1 6.9-17.6z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.2-13.5-9.9l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
+          Masuk dengan Google (Admin)</button>
+        <div style="display:flex; align-items:center; gap:10px; color:var(--mute); font-size:12px; margin:14px 0"><span style="flex:1; border-top:1px solid var(--line)"></span>atau login kasir<span style="flex:1; border-top:1px solid var(--line)"></span></div>
         <div class="form-group"><label>Username</label><input id="lu" autocomplete="username" placeholder="Masukkan username"></div>
         <div class="form-group" style="margin-bottom:24px"><label>Password</label><input id="lp" type="password" autocomplete="current-password" placeholder="Masukkan password"></div>
         <button class="btn pri" id="lg" style="width:100%; padding:14px; font-size:16px">Masuk Aplikasi</button>
@@ -1518,21 +1664,37 @@ function showLogin(msg = "") {
     } catch(e) { showLogin(errMsg(e)); }
   };
   $("#lg").onclick = attemptLogin;
+  $("#lgg").onclick = async () => {
+    const b = $("#lgg"); b.disabled = true;
+    const prov = new GoogleAuthProvider(); prov.setCustomParameters({ prompt: "select_account" });
+    try {
+      let cr;
+      try { cr = await signInWithPopup(auth, prov); }
+      catch(e) { if (e.code === "auth/popup-blocked") { await signInWithRedirect(auth, prov); return; } throw e; }
+      await afterAuth(cr.user, false);
+    } catch(e) { showLogin(errMsg(e)); }
+  };
   $("#lp").onkeydown = e => { if (e.key === "Enter") attemptLogin(); };
 }
 
 // Peran, cabang, dan role dibaca dari Firestore setelah login.
 async function loadMe(user) {
-  const s = await fsGetDoc(doc(db, "users", user.uid));
-  if (!s.exists() || s.data().active === false) {
-    await signOut(auth);
-    throw new Error(s.exists() ? "Akun dinonaktifkan." : "Akun belum diberi peran. Hubungi admin.");
+  const owner = isOwner(user);
+  let me;
+  if (owner) me = { uid: user.uid, username: user.email, role: "admin", owner: true };
+  else {
+    const s = await fsGetDoc(doc(db, "users", user.uid));
+    if (!s.exists() || s.data().active === false) {
+      await signOut(auth);
+      throw new Error(s.exists() ? "Akun dinonaktifkan." : (user.providerData.some(p => p.providerId === "google.com") ? "Akun Google ini tidak terdaftar sebagai admin." : "Akun belum diberi peran. Hubungi admin."));
+    }
+    if (s.data().role === "admin") { await signOut(auth); throw new Error("Akun admin lama sudah tidak berlaku. Admin masuk dengan Google."); }
+    me = { uid: user.uid, username: s.data().username || user.email.split("@")[0], role: s.data().role };
   }
-  const me = { uid: user.uid, username: s.data().username || user.email.split("@")[0], role: s.data().role };
   const [b, r] = await Promise.all([fsGetDoc(doc(db, "meta", "branches")), fsGetDoc(doc(db, "meta", "roles"))]);
   S.branches = b.exists() ? (b.data().list || DEF_BRANCHES) : DEF_BRANCHES;
   S.roles = r.exists() ? (r.data().map || {}) : DEF_ROLES;
-  if (me.role === "admin") {
+  if (owner) {
     const seeds = [];
     if (!b.exists()) seeds.push(setDoc(doc(db, "meta", "branches"), { list: DEF_BRANCHES }));
     if (!r.exists()) seeds.push(setDoc(doc(db, "meta", "roles"), { map: DEF_ROLES }));
@@ -1577,19 +1739,19 @@ function startApp(me, br) {
   S.all = can("lengkap");
   const ok = allowedTabs(); S.tab = ok.length ? ok[0][0] : "kasir";
 
-  document.querySelectorAll(".logout-btn").forEach(x => x.remove());
+  const hr = $("#hdr-right"); hr.innerHTML = "";
   const branchTag = document.createElement("span");
-  branchTag.className = "tag logout-btn"; branchTag.style.cssText = "margin-left:auto; background:#222; color:#fff";
-  branchTag.textContent = br.name;
+  branchTag.className = "tag"; branchTag.textContent = br.name; branchTag.title = br.name;
   const outBtn = document.createElement("button");
-  outBtn.className = "chip logout-btn";
-  outBtn.innerHTML = `Keluar <b style="color:var(--acc)">(${esc(me.username)})</b>`;
+  outBtn.className = "chip";
+  outBtn.innerHTML = `Keluar<span class="hdr-user"> <b style="color:var(--acc)">(${esc(me.username)})</b></span>`;
   outBtn.onclick = doLogout;
-  $("#main-header").append(branchTag, outBtn);
+  hr.append(branchTag, outBtn);
   subscribeData();
   nav(); view();
 }
 
+getRedirectResult(auth).catch(() => {});
 const firstAuth = new Promise(r => { const off = onAuthStateChanged(auth, u => { off(); r(u); }); });
 (async () => {
   const user = await firstAuth;
