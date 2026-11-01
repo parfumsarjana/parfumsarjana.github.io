@@ -73,14 +73,14 @@ d.querySelector('#me2').onclick=()=>navigator.geolocation.getCurrentPosition(p=>
 }catch(e){box.innerHTML='<p class=err>Peta error: '+String(e.message).replace(/</g,'&lt;')+'</p>'}};
 
 /* LOGIN */
-function L(){view(`<div class=card style="max-width:360px;margin:10vh auto"><h2>Absensi</h2><input id=em type=email placeholder=Email><input id=pw type=password placeholder=Password><div class=row><button class=p id=li>Masuk</button><button id=su>Daftar</button></div><button id=go style="width:100%">Masuk dengan Google</button><p id=er class=err></p></div>`);
+function loginUI(){view(`<div class=card style="max-width:360px;margin:10vh auto"><h2>Absensi</h2><input id=em type=email placeholder=Email><input id=pw type=password placeholder=Password><div class=row><button class=p id=li>Masuk</button><button id=su>Daftar</button></div><button id=go style="width:100%">Masuk dengan Google</button><p id=er class=err></p></div>`);
 const run=f=>f().catch(e=>$('#er').textContent=e.message);
 $('#li').onclick=()=>run(()=>signInWithEmailAndPassword(auth,$('#em').value,$('#pw').value));
 $('#su').onclick=()=>run(()=>createUserWithEmailAndPassword(auth,$('#em').value,$('#pw').value));
 $('#go').onclick=()=>run(()=>signInWithPopup(auth,new GoogleAuthProvider()))}
 
 onAuthStateChanged(auth,async u=>{
-if(!u){me=null;return L()}
+if(!u){me=null;return loginUI()}
 try{em=u.email.toLowerCase();let d=await getDoc(doc(db,'staff',em));
 if(!d.exists()){if((await list('staff',where('role','==','admin'))).length){view(bar()+`<div class=card>Akun <b>${esc(em)}</b> belum didaftarkan admin.</div>`);return}
 await setDoc(doc(db,'staff',em),{name:u.displayName||em,email:em,role:'admin',payType:'hour',rate:0});d=await getDoc(doc(db,'staff',em))}
