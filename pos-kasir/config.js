@@ -8,6 +8,10 @@ export const firebaseConfig = {
     messagingSenderId: "572331323439",
     appId: "1:572331323439:web:bff8bf4bea2fedd10d56da"
 
+};
+// Login cukup mengetik "admin" atau "kasir1"; aplikasi menambahkan domain ini menjadi email.
+export const emailDomain = "parfumsarjana.app";
+
 // Satu-satunya admin: login dengan akun Google ini (tombol "Masuk dengan Google" di halaman login).
 // Harus sama persis dengan email di firestore.rules.
 export const adminEmail = "samdhiwani123@gmail.com";
