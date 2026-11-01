@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function userDoc() { return get(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function role() { return userDoc().data.role; }
+    // Staff = akun yang terdaftar di koleksi users dan tidak dinonaktifkan.
+    function isStaff() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc().data.get('active', true) != false;
+    }
+    function isAdmin() { return isStaff() && role() == 'admin'; }
+    // Hak akses role kustom disimpan di meta/roles (map: roleId -> {name, perms}). Admin selalu lolos.
+    function can(p) {
+      return isAdmin() || (isStaff()
+        && exists(/databases/$(database)/documents/meta/roles)
+        && get(/databases/$(database)/documents/meta/roles).data.map.get(role(), {}).get('perms', {}).get(p, false) == true);
+    }
+    function recent(t) { return t > request.time - duration.value(1, 'd'); }
+
+    // Akun. Hanya admin yang boleh membuat/mengubah/menghapus.
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // Pengaturan bersama: kategori, cabang, role, template struk, gambar QRIS.
+    match /meta/{d} {
+      allow read: if isStaff();
+      allow write: if isAdmin()
+        || (d == 'categories' && (can('kategori_kelola') || can('produk_kelola')))
+        || (d == 'receipt' && can('struk_kelola'));
+    }
+
+    // Pengguna tanpa hak "produk_kelola" hanya boleh mengubah field stok (pengurangan saat penjualan).
+    match /products/{id} {
+      allow read: if isStaff();
+      allow create, delete: if can('produk_kelola');
+      allow update: if can('produk_kelola') || (isStaff() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']));
+    }
+
+    match /members/{id} {
+      allow read: if isStaff();
+      allow create: if isStaff() && request.resource.data.keys().hasOnly(['name', 'nameLower', 'phone']);
+      allow update: if can('pelanggan_kelola') || (isStaff() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['spend', 'visits']));
+      allow delete: if can('pelanggan_kelola');
+      match /purchases/{pid} {
+        allow read, create: if isStaff();
+        allow delete: if can('riwayat_batal');
+      }
+    }
+
+    // Tanpa hak "lengkap", pengguna hanya boleh membaca data 24 jam terakhir. Hapus transaksi butuh "riwayat_batal".
+    match /branches/{b}/sales/{id} {
+      allow read: if can('lengkap') || (isStaff() && recent(resource.data.ts));
+      allow create: if isStaff();
+      allow delete: if can('riwayat_batal');
+    }
+    match /branches/{b}/daily/{id} {
+      allow read: if can('lengkap') || (isStaff() && recent(resource.data.dayTs));
+      allow create, update: if isStaff();
+    }
+  }
+}
