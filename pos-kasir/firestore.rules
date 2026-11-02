@@ -23,6 +23,12 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/meta/roles)
         && get(/databases/$(database)/documents/meta/roles).data.map.get(role(), {}).get('perms', {}).get(p, false) == true);
     }
+    // Cabang yang ditugaskan ke akun (users/{uid}.branches). Admin / hak "lengkap" boleh semua cabang.
+    function myBranches() { return userDoc().data.get('branches', []); }
+    function branchOk(b) { return can('lengkap') || (isStaff() && myBranches().hasAny([b])); }
+    function stockKeysOk() {
+      return can('lengkap') || request.resource.data.get('stockBy', {}).diff(resource.data.get('stockBy', {})).affectedKeys().hasOnly(myBranches());
+    }
     function recent(t) { return t > request.time - duration.value(1, 'd'); }
 
     // Akun. Hanya admin yang boleh membuat/mengubah/menghapus.
@@ -39,12 +45,12 @@ service cloud.firestore {
         || (d == 'receipt' && can('struk_kelola'));
     }
 
-    // Pengguna tanpa hak "produk_kelola" hanya boleh mengubah field stok (pengurangan saat penjualan).
+    // Pengguna tanpa hak "produk_kelola" hanya boleh mengubah saldo stok per cabang (stockBy) saat penjualan / penyesuaian stok.
     match /products/{id} {
       allow read: if isStaff();
       allow create, delete: if can('produk_kelola');
       allow update: if can('produk_kelola')
-        || (isStaff() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']))
+        || (isStaff() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'stockBy']) && stockKeysOk())
         || (can('kategori_kelola') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['category']));
     }
 
@@ -61,13 +67,22 @@ service cloud.firestore {
 
     // Tanpa hak "lengkap", pengguna hanya boleh membaca data 24 jam terakhir. Hapus transaksi butuh "riwayat_batal".
     match /branches/{b}/sales/{id} {
-      allow read: if can('lengkap') || (isStaff() && recent(resource.data.ts));
-      allow create: if isStaff();
-      allow delete: if can('riwayat_batal');
+      allow read: if branchOk(b) && (can('lengkap') || recent(resource.data.ts));
+      allow create: if branchOk(b);
+      allow delete: if branchOk(b) && can('riwayat_batal');
+    }
+    // Riwayat stok masuk/keluar per cabang. Tidak bisa diubah atau dihapus setelah dibuat.
+    match /branches/{b}/stockLogs/{id} {
+      // Penjualan (cat 'penjualan') dicatat otomatis oleh kasir / pembatalan; kategori lain butuh hak stok.
+      allow read: if branchOk(b) && (can('stok') || can('stok_kelola'));
+      allow create: if branchOk(b) && request.resource.data.bk == b && request.resource.data.by is string
+        && request.resource.data.cat in ['penjualan', 'penyesuaian', 'opname']
+        && (request.resource.data.cat == 'penjualan' ? (can('jual') || can('riwayat_batal')) : (can('stok') || can('stok_kelola')));
+      allow update, delete: if false;
     }
     match /branches/{b}/daily/{id} {
-      allow read: if can('lengkap') || (isStaff() && recent(resource.data.dayTs));
-      allow create, update: if isStaff();
+      allow read: if branchOk(b) && (can('lengkap') || recent(resource.data.dayTs));
+      allow create, update: if branchOk(b);
     }
   }
 }
