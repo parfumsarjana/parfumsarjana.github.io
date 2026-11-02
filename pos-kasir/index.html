@@ -314,7 +314,7 @@ const dd = (t, by, sg, total, n, method, items) => ({
   day: dkey(t), dayTs: ts(sod(t)), by,
   revenue: increment(sg * total), count: increment(sg), qty: increment(sg * n),
   methods: { [method]: increment(sg * total) },
-  prod: Object.fromEntries(items.map(i => [i.id, { n: i.name, c: i.c || "", q: increment(sg * i.q), r: increment(sg * i.price * i.q) }]))
+  prod: Object.fromEntries(items.map(i => [i.id, { n: i.name, c: i.c || "", q: increment(sg * i.q), r: increment(sg * Math.round(i.price * i.q)) }]))
 });
 const isOwner = u => !!u && !!u.email && u.email.toLowerCase() === String(adminEmail).toLowerCase() && u.emailVerified === true;
 const ERR = {
@@ -443,7 +443,6 @@ function allowedTabs() {
   if (can("laporan")) t.push(["laporan", "Laporan"]);
   if (can("riwayat")) t.push(["riwayat", "Riwayat"]);
   if (can("stok") || can("stok_kelola")) t.push(["stok", "Stok"]);
-  if (can("stok") || can("stok_kelola")) t.push(["opname", "Opname"]);
   if (settingTabs().length) t.push(["pengaturan", "Pengaturan"]);
   return t;
 }
@@ -451,11 +450,12 @@ function nav() {
   if (!S.me) return;
   const tabs = allowedTabs();
   const IC = { kasir: "🛒", pelanggan: "👥", laporan: "📊", riwayat: "🧾", stok: "📦", opname: "📋", pengaturan: "⚙️" };
-  $("#nav").innerHTML = tabs.map(([k, l]) => `<button data-tab="${k}" aria-current="${S.tab === k}"><span class="ic" aria-hidden="true">${IC[k] || "•"}</span><span class="lb">${l}</span></button>`).join("");
+  $("#nav").innerHTML = tabs.map(([k, l]) => `<button data-tab="${k}" aria-current="${S.tab === k || (k === "stok" && S.tab === "opname")}"><span class="ic" aria-hidden="true">${IC[k] || "•"}</span><span class="lb">${l}</span></button>`).join("");
 }
 function view() {
   const routers = { kasir: vKasir, pelanggan: vPelanggan, laporan: vLaporan, riwayat: vRiwayat, stok: vStok, opname: vOpname, pengaturan: vPengaturan };
   const ok = allowedTabs().map(x => x[0]);
+  if (ok.includes("stok")) ok.push("opname");
   if (!ok.includes(S.tab)) {
     if (!ok.length) { $("#view").innerHTML = `<div class="panel empty">Akun ini belum punya akses ke menu apa pun. Hubungi admin.</div>`; return; }
     return go(ok[0]);
@@ -496,7 +496,7 @@ function receiptHTML(s, t = S.receipt) {
     ${t.sub ? `<div class="rc-sub">${esc(t.sub).replace(/\n/g, "<br>")}</div>` : ""}
     ${meta ? `<div class="rc-meta">${meta}</div>` : ""}
     <div class="hr"></div>
-    ${s.items.map(i => `<div class="row"><span>${i.qty}× ${esc(i.name)}${t.showUnitPrice ? `<br><small style="color:#666">@ ${rp(i.price)}</small>` : ""}</span><b>${rp(i.price * i.qty)}</b></div>`).join("")}
+    ${s.items.map(i => `<div class="row"><span>${i.u ? i.qty + " " + esc(i.u) : i.qty + "×"} ${esc(i.name)}${t.showUnitPrice ? `<br><small style="color:#666">@ ${rp(i.price)}${i.u ? "/" + esc(i.u) : ""}</small>` : ""}</span><b>${rp(i.price * i.qty)}</b></div>`).join("")}
     <div class="hr"></div>
     ${t.showDiscount && s.discount ? `<div class="row"><span>Diskon</span><span>−${rp(s.discount)}</span></div>` : ""}
     <div class="row" style="font-weight:800;font-size:15px"><span>Total</span><b>${rp(s.total)}</b></div>
@@ -513,7 +513,7 @@ function receiptText(s, t = S.receipt) {
   if (t.showDate) L.push(new Date(s.ts).toLocaleString("id-ID"));
   if (t.showKasir) L.push("Kasir: " + s.by);
   L.push("");
-  s.items.forEach(i => L.push(`${i.qty}x ${i.name}${t.showUnitPrice ? " @" + rp(i.price) : ""} = ${rp(i.price * i.qty)}`));
+  s.items.forEach(i => L.push(`${i.u ? i.qty + " " + i.u : i.qty + "x"} ${i.name}${t.showUnitPrice ? " @" + rp(i.price) + (i.u ? "/" + i.u : "") : ""} = ${rp(i.price * i.qty)}`));
   L.push("");
   if (t.showDiscount && s.discount) L.push("Diskon: -" + rp(s.discount));
   L.push("*Total: " + rp(s.total) + "*");
@@ -594,17 +594,17 @@ function renderGrid() {
   const q = S.q.toLowerCase();
   const list = S.products.filter(p => (S.cat === "Semua" || p.category === S.cat) && (!q || (p.name + " " + (p.sku || "")).toLowerCase().includes(q)));
   const { items, pager } = paginate(list, "kasir", S.vm === "grid" ? 24 : 20);
-  const stok = p => { const v = stockOf(p); return `Stok: ${v}${v <= 0 ? " (tetap bisa dibeli)" : ""}`; };
+  const stok = p => { const v = stockOf(p); return `Stok: ${v}${isBibit(p) ? " ml" : ""}${v <= 0 ? " (tetap bisa dibeli)" : ""}`; };
   if (!list.length) el.innerHTML = `<div class="empty">Produk tidak ditemukan.</div>`;
   else if (S.vm === "grid") el.innerHTML = `<div class="grid">${items.map(p => `
-      <button class="item" data-add="${p.id}"><b>${esc(p.name)}</b><small>${esc(p.category || "-")} · ${stok(p)}</small><span class="p">${rp(p.price)}</span></button>`).join("")}</div>`;
+      <button class="item" data-add="${p.id}"><b>${esc(p.name)}</b><small>${esc(p.category || "-")} · ${stok(p)}</small><span class="p">${rp(p.price)}${isBibit(p) ? " / ml" : ""}</span></button>`).join("")}</div>`;
   else el.innerHTML = `<div class="plist">${items.map(p => `
-      <button class="prow" data-add="${p.id}"><span><b>${esc(p.name)}</b><small>${esc(p.sku ? p.sku + " · " : "")}${esc(p.category || "-")} · ${stok(p)}</small></span><span class="p">${rp(p.price)}</span><span class="plus">+</span></button>`).join("")}</div>`;
+      <button class="prow" data-add="${p.id}"><span><b>${esc(p.name)}</b><small>${esc(p.sku ? p.sku + " · " : "")}${esc(p.category || "-")} · ${stok(p)}</small></span><span class="p">${rp(p.price)}${isBibit(p) ? " / ml" : ""}</span><span class="plus">+</span></button>`).join("")}</div>`;
   $("#gpager").innerHTML = pager;
 }
 function getCartData() {
   const lines = Object.entries(S.cart).map(([id, qty]) => { const p = S.products.find(x => x.id === id); return p ? { ...p, stock: stockOf(p), qty } : null; }).filter(Boolean);
-  const sub = lines.reduce((a, l) => a + (l.price * l.qty), 0);
+  const sub = lines.reduce((a, l) => a + Math.round(l.price * l.qty), 0);
   const disc = Math.min(Math.max(+S.disc || 0, 0), sub);
   return { lines, sub, disc, total: sub - disc };
 }
@@ -613,11 +613,11 @@ const cartLines = d => d.lines.length ? d.lines.map(l => `
       <div><b style="display:block; margin-bottom:4px">${esc(l.name)}</b><span style="color:var(--mute); font-size:13px">${rp(l.price)}</span></div>
       <div style="text-align:right">
         <b style="display:block; margin-bottom:6px">${rp(l.price * l.qty)}</b>
-        <span class="qty"><button data-dec="${l.id}">−</button><span style="font-weight:600; width:20px; text-align:center">${l.qty}</span><button data-add="${l.id}">+</button></span>
+        <span class="qty"><button data-dec="${l.id}">−</button>${isBibit(l) ? `<input type="number" step="any" min="0" inputmode="decimal" data-qtyml="${l.id}" value="${l.qty}" style="width:70px; padding:6px; text-align:center"><span style="font-size:12px; color:var(--mute)">ml</span>` : `<span style="font-weight:600; width:20px; text-align:center">${l.qty}</span>`}<button data-add="${l.id}">+</button></span>
       </div>
     </div>`).join("") : `<div class="empty">Keranjang kosong.</div>`;
 function renderCart() {
-  const d = getCartData(), n = d.lines.reduce((a, l) => a + l.qty, 0), html = cartLines(d);
+  const d = getCartData(), n = d.lines.reduce((a, l) => a + (isBibit(l) ? 1 : l.qty), 0), html = cartLines(d);
   const it = $("#items-section");
   if (it) { it.innerHTML = html; $("#sub").textContent = rp(d.sub); $("#total").textContent = rp(d.total); }
   const mn = $("#mbar-n");
@@ -749,14 +749,14 @@ async function processCheckout() {
   try {
     const now = Date.now(), bk = S.me.bk, day = dkey(now), by = S.me.username;
     const saleId = "INV" + day.slice(2).replace(/-/g, "") + "-" + Math.random().toString(36).slice(2, 6).toUpperCase();
-    const items = d.lines.map(l => ({ id: l.id, name: l.name, c: l.category || "", price: l.price, qty: l.qty, note: l.stock - l.qty < 0 ? "stok minus" : null }));
+    const items = d.lines.map(l => ({ id: l.id, name: l.name, c: l.category || "", price: l.price, qty: l.qty, ...(isBibit(l) ? { u: "ml" } : {}), note: r2(l.stock - l.qty) < 0 ? "stok minus" : null }));
     const m = S.member ? { id: S.member.id, name: S.member.name, phone: S.member.phone } : null;
     const sale = { ts: ts(now), day, branch: S.me.branch, bk, by, member: m, items, subtotal: d.sub, discount: d.disc, total: d.total, method: S.method, paid, change: paid - d.total };
     const b = writeBatch(db);
     b.set(doc(db, "branches", bk, "sales", saleId), sale);
     d.lines.forEach((l, i) => {
       b.update(getDoc("products", l.id), { ["stockBy." + bk]: increment(-l.qty) });
-      b.set(doc(db, "branches", bk, "stockLogs", "L" + saleId + "-" + i), { ts: ts(now), bk, branch: S.me.branch, pid: l.id, pname: l.name, sku: l.sku || "", type: "out", qty: l.qty, before: l.stock, after: l.stock - l.qty, by, note: "Penjualan " + saleId, src: "penjualan", cat: "penjualan", ref: saleId });
+      b.set(doc(db, "branches", bk, "stockLogs", "L" + saleId + "-" + i), { ts: ts(now), bk, branch: S.me.branch, pid: l.id, pname: l.name, sku: l.sku || "", type: "out", qty: l.qty, before: l.stock, after: r2(l.stock - l.qty), by, note: "Penjualan " + saleId, src: "penjualan", cat: "penjualan", ref: saleId });
     });
     b.set(doc(db, "branches", bk, "daily", day + "_" + by), dd(now, by, 1, d.total, d.lines.reduce((a, l) => a + l.qty, 0), S.method, items.map(i => ({...i, q: i.qty}))), { merge: true });
     if (m) {
@@ -787,7 +787,7 @@ function voidSale(id) {
       s.items.forEach((i, k) => {
         const p = S.products.find(x => x.id === i.id); if (!p) return; const bf = stockOf(p, bk);
         b.update(getDoc("products", i.id), { ["stockBy." + bk]: increment(i.qty) });
-        b.set(doc(db, "branches", bk, "stockLogs", "V" + id + "-" + k), { ts: ts(Date.now()), bk, branch: brName(bk), pid: i.id, pname: i.name, sku: p.sku || "", type: "in", qty: i.qty, before: bf, after: bf + i.qty, by: S.me.username, note: "Pembatalan " + id, src: "penjualan", cat: "penjualan", ref: id });
+        b.set(doc(db, "branches", bk, "stockLogs", "V" + id + "-" + k), { ts: ts(Date.now()), bk, branch: brName(bk), pid: i.id, pname: i.name, sku: p.sku || "", type: "in", qty: i.qty, before: bf, after: r2(bf + i.qty), by: S.me.username, note: "Pembatalan " + id, src: "penjualan", cat: "penjualan", ref: id });
       });
       b.set(doc(db, "branches", bk, "daily", s.day + "_" + by), dd(s.ts, by, -1, s.total, n, s.method, items), { merge: true });
       if (s.member) {
@@ -1115,7 +1115,7 @@ function renderProdTable() {
   tb.innerHTML = items.length ? items.map(p => `
     <tr>
       <td><input type="checkbox" data-sel="${p.id}" ${S.sel.has(p.id) ? "checked" : ""}></td>
-      <td><b>${esc(p.name)}</b><br><small style="color:var(--mute)">${esc(p.sku)}</small></td>
+      <td><b>${esc(p.name)}</b><br><small style="color:var(--mute)">${esc(p.sku)}</small>${isBibit(p) ? `<br><span class="tag">bibit · ${p.gPerMl} g/ml · botol ${p.bottleG || 0} g</span>` : ""}</td>
       <td>${esc(p.category || "-")}</td><td class="n">${rp(p.price)}</td>
       <td style="font-size:13px">${stockInfoHTML(p)}</td>
       <td><button class="btn sm" data-editprod="${p.id}">Edit</button><button class="btn sm del" data-delprod="${p.id}" style="margin-left:4px">Hapus</button></td>
@@ -1132,6 +1132,10 @@ function openProductForm(id) {
     <div class="form-group"><label>Kategori</label><select id="fp-cat"><option value="">Tanpa Kategori</option>
       ${S.cats.map(c => `<option value="${esc(c.id)}" ${e.category === c.id ? "selected" : ""}>${esc(c.id)}</option>`).join("")}</select></div>
     <div class="form-group"><label>Harga (Rp)</label><input type="number" id="fp-price" value="${esc(e.price)}"></div>
+    <div class="form-group" style="border:1px solid var(--line); border-radius:8px; padding:12px"><label style="color:var(--ink)">Pengaturan Bibit (opsional, kosongkan jika bukan bibit)</label>
+      <div class="form-row"><div><label>1 ml = berapa gram</label><input type="number" step="any" min="0" id="fp-gml" placeholder="mis. 0.85" value="${esc(e.gPerMl || "")}"></div>
+      <div><label>Berat botol kosong (gram)</label><input type="number" step="any" min="0" id="fp-bot" placeholder="mis. 35" value="${esc(e.bottleG || "")}"></div></div>
+      <small style="color:var(--mute)">Jika diisi, stok bibit dihitung dalam ml dan saat Stok Opname cukup isi berat timbangan (gram).</small></div>
     <div class="form-group"><label>Stok per cabang (info saja)</label>${id ? `<div style="display:flex; gap:16px; flex-wrap:wrap">${stockInfoHTML(e)}</div>` : `<div style="color:var(--mute)">Stok awal 0 di semua cabang.</div>`}<small style="color:var(--mute)">Ubah stok lewat tab Stok.</small></div>
     <div class="dlg-actions"><button class="btn" data-close="1">Batal</button><button class="btn pri" id="fp-save" data-pid="${esc(id || "")}">Simpan</button></div>`);
 }
@@ -1139,7 +1143,10 @@ async function saveProduct(id) {
   const name = $("#fp-name").value.trim(), price = +$("#fp-price").value;
   if (!name || $("#fp-price").value === "" || isNaN(price)) return toast("Data wajib diisi dengan benar.");
   try {
-    await setDoc(getDoc("products", id || "P" + Date.now()), { name, sku: $("#fp-sku").value.trim(), category: $("#fp-cat").value, price }, { merge: true });
+    const gml = +$("#fp-gml").value || 0, bot = +$("#fp-bot").value || 0;
+    if (gml < 0 || bot < 0) return toast("Pengaturan bibit tidak boleh negatif.");
+    if (bot > 0 && !gml) return toast("Isi '1 ml = berapa gram' jika berat botol diisi.");
+    await setDoc(getDoc("products", id || "P" + Date.now()), { name, sku: $("#fp-sku").value.trim(), category: $("#fp-cat").value, price, gPerMl: gml > 0 ? gml : deleteField(), bottleG: gml > 0 ? bot : deleteField() }, { merge: true });
     $("#dlg").close(); toast("Tersimpan"); view();
   } catch(e) { toast("Gagal: " + errMsg(e)); }
 }
@@ -1646,7 +1653,7 @@ function vStok() {
     <div class="panel">
       <h2>Riwayat Stok ${S.all ? "" : "— " + esc(S.me.branch)}</h2>
       <div class="toolbar" style="margin-bottom:14px">
-        <button class="btn pri" data-stkadd="in">＋ Stok Masuk</button><button class="btn" data-stkadd="out">－ Stok Keluar</button>
+        <button class="btn pri" data-stkadd="in">＋ Stok Masuk</button><button class="btn" data-stkadd="out">－ Stok Keluar</button><button class="btn" data-opname="1">📋 Opname</button>
         ${adm ? `<button class="btn" data-stkexp="1">⬇ Ekspor</button>` : ""}
       </div>
       ${nLeg ? `<div class="filterbox" style="border-color:var(--warn)"><b>${nLeg} produk masih memakai stok lama (belum dipisah per cabang).</b>
@@ -1702,16 +1709,16 @@ async function applyStock(entries, src = "manual") {
   const now = Date.now(), by = S.me.username, run = new Map(), ops = [];
   entries.forEach(e => {
     const key = e.p.id + "|" + e.bk, before = run.has(key) ? run.get(key) : stockOf(e.p, e.bk);
-    const delta = e.type === "in" ? e.qty : e.type === "out" ? -e.qty : e.qty - before;
+    const delta = e.type === "in" ? e.qty : e.type === "out" ? -e.qty : r2(e.qty - before);
     if (!delta && e.cat !== "opname") return;
-    run.set(key, before + delta); ops.push({ e, before, delta });
+    run.set(key, r2(before + delta)); ops.push({ e, before, delta });
   });
   for (let i = 0; i < ops.length; i += 200) {
     const b = writeBatch(db);
     ops.slice(i, i + 200).forEach((o, j) => {
       const e = o.e, id = "S" + now + "-" + (i + j) + "-" + Math.random().toString(36).slice(2, 5);
       if (o.delta || e.legacy) b.update(getDoc("products", e.p.id), { ["stockBy." + e.bk]: increment(o.delta), ...(e.legacy ? { stock: deleteField() } : {}) });
-      b.set(doc(db, "branches", e.bk, "stockLogs", id), { ts: ts(now), bk: e.bk, branch: brName(e.bk), pid: e.p.id, pname: e.p.name, sku: e.p.sku || "", type: o.delta > 0 ? "in" : "out", qty: Math.abs(o.delta), before: o.before, after: o.before + o.delta, by, note: e.note || (e.type === "set" ? (e.cat === "opname" ? "Stok fisik hasil opname: " : "Atur stok menjadi ") + e.qty : ""), src, cat: e.cat || "penyesuaian" });
+      b.set(doc(db, "branches", e.bk, "stockLogs", id), { ts: ts(now), bk: e.bk, branch: brName(e.bk), pid: e.p.id, pname: e.p.name, sku: e.p.sku || "", type: o.delta > 0 ? "in" : "out", qty: Math.abs(o.delta), before: o.before, after: r2(o.before + o.delta), by, note: e.note || (e.type === "set" ? (e.cat === "opname" ? "Stok fisik hasil opname: " : "Atur stok menjadi ") + e.qty : ""), src, cat: e.cat || "penyesuaian" });
     });
     await b.commit();
   }
@@ -1772,22 +1779,33 @@ async function exportStock() {
 // ==========================================
 // VIEW: STOK OPNAME
 // ==========================================
-const OP = { bk: "", q: "", vals: {}, note: "" };
+const OP = { bk: "", q: "", cat: "Semua", vals: {}, note: "" };
+const r2 = n => Math.round(n * 100) / 100;
+const isBibit = p => +p.gPerMl > 0;
+// Stok real: bibit = (timbangan gr - berat botol) / (gr per ml) dalam ml; produk biasa = jumlah pcs.
+function opReal(p) {
+  const raw = OP.vals[opBk() + "|" + p.id];
+  if (raw === undefined || raw === "" || isNaN(+raw)) return null;
+  if (isBibit(p)) return Math.max(0, Math.round(((+raw - (+p.bottleG || 0)) / +p.gPerMl) * 10) / 10);
+  return Math.round(+raw);
+}
 const opBk = () => (OP.bk && stkBrs().some(b => b.key === OP.bk) ? OP.bk : (stkBrs().find(b => b.key === S.me.bk) || stkBrs()[0] || {}).key);
-const opList = () => { const q = OP.q.trim().toLowerCase(); return S.products.filter(p => !q || (p.name + " " + (p.sku || "")).toLowerCase().includes(q)); };
-function opDiff(p) { const v = OP.vals[opBk() + "|" + p.id]; return v === undefined || v === "" ? null : Math.round(+v) - stockOf(p, opBk()); }
+const opList = () => { const q = OP.q.trim().toLowerCase(); return S.products.filter(p => (OP.cat === "Semua" || (OP.cat === "Tanpa Kategori" ? !p.category : p.category === OP.cat)) && (!q || (p.name + " " + (p.sku || "")).toLowerCase().includes(q))); };
+function opDiff(p) { const v = opReal(p); return v === null ? null : r2(v - stockOf(p, opBk())); }
 function vOpname() {
   const brs = stkBrs(), bk = opBk();
   $("#view").innerHTML = `
     <div class="panel">
+      <button class="btn sm" data-tab="stok" style="margin-bottom:12px">← Kembali ke Stok</button>
       <h2>Stok Opname ${S.all ? "" : "— " + esc(S.me.branch)}</h2>
-      <p style="color:var(--mute); margin-top:-8px">Isi stok real hasil hitung. Selisih dihitung otomatis terhadap stok di sistem. Produk yang dikosongkan dilewati. Saat disimpan, stok di sistem diganti dengan stok real dan tercatat di Riwayat Stok.</p>
+      <p style="color:var(--mute); margin-top:-8px">Isi stok real hasil hitung. Untuk produk bibit, isi berat timbangan (gram): sistem otomatis mengurangi berat botol dan mengubahnya ke ml. Selisih dihitung otomatis terhadap stok di sistem. Produk yang dikosongkan dilewati. Saat disimpan, stok di sistem diganti dengan stok real dan tercatat di Riwayat Stok.</p>
       <div class="filterbox"><div class="form-row" style="flex-wrap:wrap">
         ${S.all && brs.length > 1 ? `<div class="form-group" style="margin:0"><label>Cabang</label><select id="op-br">${brs.map(b => `<option value="${esc(b.key)}" ${b.key === bk ? "selected" : ""}>${esc(b.name)}</option>`).join("")}</select></div>` : ""}
+        <div class="form-group" style="margin:0"><label>Kategori</label><select id="op-cat">${["Semua", ...S.cats.map(c => c.id), "Tanpa Kategori"].map(c => `<option value="${esc(c)}" ${OP.cat === c ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
         <div class="form-group" style="margin:0"><label>Cari produk</label><input id="op-q" placeholder="Nama / SKU..." value="${esc(OP.q)}"></div>
         <div class="form-group" style="margin:0"><label>Catatan (opsional)</label><input id="op-n" maxlength="120" placeholder="mis. Opname akhir bulan" value="${esc(OP.note)}"></div></div></div>
       <div id="op-sum" class="stats"></div>
-      <div class="wrap"><table><thead><tr><th>Produk</th><th class="n">Stok Sistem</th><th style="width:120px">Stok Real</th><th class="n">Selisih</th></tr></thead><tbody id="op-body"></tbody></table></div>
+      <div class="wrap"><table><thead><tr><th>Produk</th><th class="n">Stok Sistem</th><th style="width:150px">Stok Real <small>(bibit: gram)</small></th><th class="n">Selisih</th></tr></thead><tbody id="op-body"></tbody></table></div>
       <div id="op-pager"></div>
       <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin-top:16px"><button class="btn" data-opclr="1">Kosongkan isian</button><button class="btn pri" id="op-save">Simpan Hasil Opname</button></div>
     </div>`;
@@ -1797,7 +1815,7 @@ function renderOpBody() {
   const tb = $("#op-body"); if (!tb) return;
   const { items, pager } = paginate(opList(), "op", 30), bk = opBk();
   tb.innerHTML = items.length ? items.map(p => `<tr data-opr="${esc(p.id)}"><td><b>${esc(p.name)}</b><br><small style="color:var(--mute)">${esc(p.sku || "")}</small></td><td class="n os"></td>
-    <td><input type="number" step="1" min="0" inputmode="numeric" data-opv="${esc(p.id)}" value="${esc(OP.vals[bk + "|" + p.id] ?? "")}" style="padding:8px"></td><td class="n od"></td></tr>`).join("") : `<tr><td colspan="4" class="empty">Produk tidak ditemukan.</td></tr>`;
+    <td><input type="number" step="${isBibit(p) ? "any" : "1"}" min="0" inputmode="decimal" data-opv="${esc(p.id)}" value="${esc(OP.vals[bk + "|" + p.id] ?? "")}" placeholder="${isBibit(p) ? "gram" : ""}" style="padding:8px">${isBibit(p) ? `<div class="oc" style="font-size:12px; color:var(--mute); margin-top:2px"></div>` : ""}</td><td class="n od"></td></tr>`).join("") : `<tr><td colspan="4" class="empty">Produk tidak ditemukan.</td></tr>`;
   $("#op-pager").innerHTML = pager; updOp();
 }
 function updOp() {
@@ -1806,15 +1824,16 @@ function updOp() {
   document.querySelectorAll("[data-opr]").forEach(tr => {
     const p = S.products.find(x => x.id === tr.dataset.opr); if (!p) return;
     const d = opDiff(p), c = tr.querySelector(".od");
-    tr.querySelector(".os").textContent = stockOf(p, bk);
-    c.textContent = d === null ? "-" : (d > 0 ? "+" : "") + d; c.style.color = d > 0 ? "#166534" : d < 0 ? "var(--bad)" : "inherit"; c.style.fontWeight = "800";
+    tr.querySelector(".os").textContent = stockOf(p, bk) + (isBibit(p) ? " ml" : "");
+    const oc = tr.querySelector(".oc"); if (oc) { const rv = opReal(p); oc.textContent = rv === null ? "= ? ml" : "= " + rv + " ml"; }
+    c.textContent = d === null ? "-" : (d > 0 ? "+" : "") + d + (isBibit(p) ? " ml" : ""); c.style.color = d > 0 ? "#166534" : d < 0 ? "var(--bad)" : "inherit"; c.style.fontWeight = "800";
   });
   const el = $("#op-sum");
   if (el) el.innerHTML = `<div class="stat"><span>Produk dihitung</span><b>${n}</b></div><div class="stat"><span>Selisih lebih (+)</span><b style="color:#166534">+${plus}</b></div><div class="stat"><span>Selisih kurang (−)</span><b style="color:var(--bad)">${minus}</b></div><div class="stat"><span>Sesuai</span><b>${same}</b></div>`;
 }
 function saveOpname() {
   const bk = opBk(), note = OP.note.trim();
-  const ents = S.products.filter(p => opDiff(p) !== null).map(p => ({ p, bk, type: "set", qty: Math.round(+OP.vals[bk + "|" + p.id]), cat: "opname", note }));
+  const ents = S.products.filter(p => opDiff(p) !== null).map(p => ({ p, bk, type: "set", qty: opReal(p), cat: "opname", note: [note, isBibit(p) ? "Timbang " + OP.vals[bk + "|" + p.id] + " g" : ""].filter(Boolean).join(" · ") }));
   if (!ents.length) return toast("Isi stok real minimal satu produk");
   if (ents.some(x => isNaN(x.qty) || x.qty < 0)) return toast("Stok real tidak boleh negatif");
   const ch = ents.filter(x => x.qty !== stockOf(x.p, bk)).length;
@@ -1844,6 +1863,7 @@ document.addEventListener("click", e => {
   else if (t.id === "sf-go") saveStockForm();
   else if (t.id === "op-save") saveOpname();
   else if (d.opclr) { const bk = opBk(); Object.keys(OP.vals).filter(k => k.startsWith(bk + "|")).forEach(k => delete OP.vals[k]); renderOpBody(); }
+  else if (d.opname) go("opname");
   else if (d.stkexp) exportStock();
   else if (d.stkmig) openMigrate();
   else if (t.id === "mg-go") runMigrate();
@@ -1938,6 +1958,7 @@ document.addEventListener("input", e => {
   else if (el.dataset.sfq) { S.stk.fq[el.dataset.sfq] = Math.round(+el.value) || 0; cntSf(); }
   else if (id === "sf-q" || id === "sf-br") fillSf();
   else if (el.dataset.opv) { OP.vals[opBk() + "|" + el.dataset.opv] = el.value; updOp(); }
+  else if (id === "op-cat") { OP.cat = el.value; S.pg.op = 1; renderOpBody(); }
   else if (id === "op-q") { OP.q = el.value; S.pg.op = 1; renderOpBody(); }
   else if (id === "op-n") OP.note = el.value;
   else if (id === "q") { S.q = el.value; S.pg.kasir = 1; renderGrid(); }
@@ -1957,6 +1978,7 @@ document.addEventListener("input", e => {
 document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "fc-name") { e.preventDefault(); $("#fc-add").click(); } });
 document.addEventListener("change", e => {
   const cid = e.target.id;
+  if (e.target.dataset.qtyml) { const v = Math.round((+e.target.value || 0) * 10) / 10; if (v > 0) S.cart[e.target.dataset.qtyml] = v; else delete S.cart[e.target.dataset.qtyml]; renderCart(); return; }
   if (cid === "sk-from" || cid === "sk-to") { S.stk[cid === "sk-from" ? "from" : "to"] = e.target.value; loadStock(); return; }
   if (cid === "op-br") { OP.bk = e.target.value; renderOpBody(); return; }
   if (cid === "sk-br") { S.stk.br = e.target.value; loadStock(); return; }
