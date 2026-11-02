@@ -273,8 +273,8 @@ const PERMS = [
   ["produk_kelola", "Kelola produk (tambah, edit, hapus, Excel)"],
   ["kategori_kelola", "Kelola kategori"],
   ["struk_kelola", "Edit template struk"],
-  ["stok", "Stok: lihat riwayat, tambah & kurangi stok"],
-  ["stok_kelola", "Stok: edit massal, ekspor & migrasi"]
+  ["stok", "Stok & Opname: lihat riwayat, tambah/kurangi stok, stok opname"],
+  ["stok_kelola", "Stok: ekspor riwayat & migrasi stok lama"]
 ];
 const DEF_BRANCHES = [{ key: "ums", name: "Parfum Sarjana UMS", active: true }, { key: "uns", name: "Parfum Sarjana UNS", active: true }];
 const DEF_ROLES = { kasir: { name: "Kasir", perms: { jual: true, pelanggan: true, laporan: true, riwayat: true } } };
@@ -345,7 +345,7 @@ function paginate(arr, key, size = PAGE) {
 }
 const PG_RENDER = {
   kasir: () => renderGrid(), plist: () => renderPList(), hist: () => renderHist(),
-  rw: () => renderRwBody(), slog: () => renderStkBody(), ssaldo: () => renderSaldoBody(), sprod: () => renderProdTable(), sstaff: () => rSetStaff()
+  rw: () => renderRwBody(), slog: () => renderStkBody(), op: () => renderOpBody(), sprod: () => renderProdTable(), sstaff: () => rSetStaff()
 };
 
 // ---------- DATA ----------
@@ -355,7 +355,7 @@ function subscribeData() {
   unsubscribers.forEach(u => u()); unsubscribers = [];
   const live = () => {
     if (S.tab === "kasir") { renderCats(); renderGrid(); renderCart(); }
-    else if (S.tab === "stok" && S.stk.view === "saldo") renderSaldoBody();
+    else if (S.tab === "opname") updOp();
     else if (S.tab === "pengaturan" && S.setTab !== "staff" && !modalOpen() && !document.activeElement.closest("#view input, #view select, #view textarea")) view();
   };
   const sub = (ref, fn) => unsubscribers.push(onSnapshot(ref, fn, () => {}));
@@ -443,17 +443,18 @@ function allowedTabs() {
   if (can("laporan")) t.push(["laporan", "Laporan"]);
   if (can("riwayat")) t.push(["riwayat", "Riwayat"]);
   if (can("stok") || can("stok_kelola")) t.push(["stok", "Stok"]);
+  if (can("stok") || can("stok_kelola")) t.push(["opname", "Opname"]);
   if (settingTabs().length) t.push(["pengaturan", "Pengaturan"]);
   return t;
 }
 function nav() {
   if (!S.me) return;
   const tabs = allowedTabs();
-  const IC = { kasir: "🛒", pelanggan: "👥", laporan: "📊", riwayat: "🧾", stok: "📦", pengaturan: "⚙️" };
+  const IC = { kasir: "🛒", pelanggan: "👥", laporan: "📊", riwayat: "🧾", stok: "📦", opname: "📋", pengaturan: "⚙️" };
   $("#nav").innerHTML = tabs.map(([k, l]) => `<button data-tab="${k}" aria-current="${S.tab === k}"><span class="ic" aria-hidden="true">${IC[k] || "•"}</span><span class="lb">${l}</span></button>`).join("");
 }
 function view() {
-  const routers = { kasir: vKasir, pelanggan: vPelanggan, laporan: vLaporan, riwayat: vRiwayat, stok: vStok, pengaturan: vPengaturan };
+  const routers = { kasir: vKasir, pelanggan: vPelanggan, laporan: vLaporan, riwayat: vRiwayat, stok: vStok, opname: vOpname, pengaturan: vPengaturan };
   const ok = allowedTabs().map(x => x[0]);
   if (!ok.includes(S.tab)) {
     if (!ok.length) { $("#view").innerHTML = `<div class="panel empty">Akun ini belum punya akses ke menu apa pun. Hubungi admin.</div>`; return; }
@@ -1631,7 +1632,6 @@ async function exportMemberHistory() {
 // VIEW: STOK (per cabang, dengan riwayat masuk/keluar)
 // ==========================================
 const stkBrs = () => S.all ? S.branches.filter(b => b.active !== false) : S.branches.filter(b => b.key === S.me.bk);
-const saldoCols = () => S.all ? S.branches : S.branches.filter(b => b.key === S.me.bk);
 const KAT = { penjualan: "Penjualan", penyesuaian: "Penyesuaian", opname: "Stok Opname" };
 const KATSTYLE = { penjualan: "background:#dbeafe; color:#1e40af", penyesuaian: "", opname: "background:#fef3c7; color:#92400e" };
 const katOf = x => x.cat || "penyesuaian";
@@ -1639,42 +1639,34 @@ const SRC = { manual: "", massal: "massal", migrasi: "migrasi" };
 function stkInit() { if (!S.stk.from) { S.stk.from = dkey(Date.now() - 29 * 864e5); S.stk.to = dkey(Date.now()); } if (!S.all) S.stk.br = S.me.bk; }
 function vStok() {
   stkInit();
-  const st = S.stk, adm = can("stok_kelola"), hist = st.view === "hist", cols = saldoCols();
+  const st = S.stk, adm = can("stok_kelola");
   const brSel = S.all ? `<div class="form-group" style="margin:0"><label>Cabang</label><select id="sk-br"><option value="Semua">Semua Cabang</option>${S.branches.map(b => `<option value="${esc(b.key)}" ${st.br === b.key ? "selected" : ""}>${esc(b.name)}</option>`).join("")}</select></div>` : "";
-  const filt = hist ? `<div class="form-row" style="flex-wrap:wrap">
-      <div class="form-group" style="margin:0"><label>Dari tanggal</label><input type="date" id="sk-from" value="${esc(st.from)}"></div>
-      <div class="form-group" style="margin:0"><label>Sampai tanggal</label><input type="date" id="sk-to" value="${esc(st.to)}"></div>
-      ${brSel}
-      <div class="form-group" style="margin:0"><label>Produk</label><input id="sk-prod" list="sk-pl" placeholder="Nama / SKU..." value="${esc(st.prod)}"></div>
-      <div class="form-group" style="margin:0"><label>Jenis</label><select id="sk-type"><option value="">Semua</option><option value="in" ${st.type === "in" ? "selected" : ""}>Masuk</option><option value="out" ${st.type === "out" ? "selected" : ""}>Keluar</option></select></div>
-      <div class="form-group" style="margin:0"><label>Kategori</label><select id="sk-kat"><option value="">Semua</option>${Object.entries(KAT).map(([k, l]) => `<option value="${k}" ${st.kat === k ? "selected" : ""}>${l}</option>`).join("")}</select></div></div>
-      <datalist id="sk-pl">${S.products.map(p => `<option value="${esc(p.name)}">`).join("")}</datalist>`
-    : `<div class="form-row" style="flex-wrap:wrap"><div class="form-group" style="margin:0"><label>Cari produk</label><input id="sk-q" placeholder="Nama / SKU..." value="${esc(st.q)}"></div>
-      <div class="form-group" style="margin:0"><label>Kategori</label><select id="sk-cat">${["Semua", ...S.cats.map(c => c.id), "Tanpa Kategori"].map(c => `<option ${st.cat === c ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div></div>`;
   const nLeg = S.admin ? S.products.filter(p => typeof p.stock === "number").length : 0;
   $("#view").innerHTML = `
     <div class="panel">
-      <div class="row" style="margin-bottom:12px; flex-wrap:wrap">
-        <h2 style="margin:0">Stok ${S.all ? "" : "— " + esc(S.me.branch)}</h2>
-        <div class="seg"><button data-stkview="hist" aria-pressed="${hist}">Riwayat</button><button data-stkview="saldo" aria-pressed="${!hist}">Saldo Stok</button></div>
-      </div>
+      <h2>Riwayat Stok ${S.all ? "" : "— " + esc(S.me.branch)}</h2>
       <div class="toolbar" style="margin-bottom:14px">
         <button class="btn pri" data-stkadd="in">＋ Stok Masuk</button><button class="btn" data-stkadd="out">－ Stok Keluar</button>
-        ${adm ? `<button class="btn" data-stkmass="1" id="stk-mass">Edit Massal</button><button class="btn" data-stkexp="1">⬇ Ekspor</button>` : ""}
+        ${adm ? `<button class="btn" data-stkexp="1">⬇ Ekspor</button>` : ""}
       </div>
       ${nLeg ? `<div class="filterbox" style="border-color:var(--warn)"><b>${nLeg} produk masih memakai stok lama (belum dipisah per cabang).</b>
         <div style="color:var(--mute); margin:4px 0 10px">Migrasikan sekali agar stok lama masuk ke salah satu cabang.</div><button class="btn pri sm" data-stkmig="1">Migrasikan stok lama</button></div>` : ""}
-      <div class="filterbox">${filt}</div>
-      ${hist ? `<div id="sk-sum" style="color:var(--mute); margin-bottom:8px"></div>
-        <div class="wrap"><table><thead><tr><th>Waktu</th>${S.all ? "<th>Cabang</th>" : ""}<th>Produk</th><th>Kategori</th><th>Jenis</th><th class="n">Jumlah</th><th class="n">Stok</th><th>Oleh</th><th>Catatan</th></tr></thead><tbody id="sk-body"></tbody></table></div><div id="sk-pager"></div>`
-      : `<div class="wrap"><table><thead><tr>${adm ? `<th style="width:36px"><input type="checkbox" id="sk-all" title="Pilih semua hasil filter"></th>` : ""}<th>Produk</th><th>Kategori</th>${cols.map(b => `<th class="n">${esc(brShort(b))}</th>`).join("")}<th>Ubah</th></tr></thead><tbody id="ss-body"></tbody></table></div><div id="ss-pager"></div>`}
+      <div class="filterbox"><div class="form-row" style="flex-wrap:wrap">
+        <div class="form-group" style="margin:0"><label>Dari tanggal</label><input type="date" id="sk-from" value="${esc(st.from)}"></div>
+        <div class="form-group" style="margin:0"><label>Sampai tanggal</label><input type="date" id="sk-to" value="${esc(st.to)}"></div>
+        ${brSel}
+        <div class="form-group" style="margin:0"><label>Produk</label><input id="sk-prod" list="sk-pl" placeholder="Nama / SKU..." value="${esc(st.prod)}"></div>
+        <div class="form-group" style="margin:0"><label>Jenis</label><select id="sk-type"><option value="">Semua</option><option value="in" ${st.type === "in" ? "selected" : ""}>Masuk</option><option value="out" ${st.type === "out" ? "selected" : ""}>Keluar</option></select></div>
+        <div class="form-group" style="margin:0"><label>Kategori</label><select id="sk-kat"><option value="">Semua</option>${Object.entries(KAT).map(([k, l]) => `<option value="${k}" ${st.kat === k ? "selected" : ""}>${l}</option>`).join("")}</select></div></div>
+        <datalist id="sk-pl">${S.products.map(p => `<option value="${esc(p.name)}">`).join("")}</datalist></div>
+      <div id="sk-sum" style="color:var(--mute); margin-bottom:8px"></div>
+      <div class="wrap"><table><thead><tr><th>Waktu</th>${S.all ? "<th>Cabang</th>" : ""}<th>Produk</th><th>Kategori</th><th>Jenis</th><th class="n">Jumlah</th><th class="n">Stok</th><th>Oleh</th><th>Catatan</th></tr></thead><tbody id="sk-body"></tbody></table></div><div id="sk-pager"></div>
     </div>`;
-  hist ? renderStkBody() : renderSaldoBody();
+  renderStkBody();
 }
 async function loadStock() {
   stkInit();
   const st = S.stk;
-  if (st.view !== "hist") return view();
   st.logs = null; view();
   const f = new Date(st.from + "T00:00:00").getTime(), t = new Date(st.to + "T00:00:00").getTime() + 864e5;
   if (isNaN(f) || isNaN(t) || t <= f) { toast("Rentang tanggal tidak valid"); st.logs = []; return view(); }
@@ -1684,7 +1676,7 @@ async function loadStock() {
     st.logs = r.flatMap((sn, i) => sn.docs.map(d => ({ ...d.data(), id: d.id, bk: d.data().bk || keys[i], ts: d.data().ts.toMillis() }))).sort((a, b) => b.ts - a.ts);
     S.pg.slog = 1;
   } catch (e) { toast("Gagal memuat: " + errMsg(e)); st.logs = []; }
-  if (S.tab === "stok" && st.view === "hist") view();
+  if (S.tab === "stok") view();
 }
 function stkFiltered() {
   const st = S.stk, q = st.prod.trim().toLowerCase();
@@ -1704,23 +1696,6 @@ function renderStkBody() {
     <td class="n"><b>${x.qty ? (x.type === "in" ? "+" : "−") : ""}${x.qty}</b></td><td class="n">${x.before} → ${x.after}</td><td>${esc(x.by)}</td>
     <td>${esc(x.note || "")}${SRC[x.src] ? ` <span class="tag">${SRC[x.src]}</span>` : ""}</td></tr>`).join("") : `<tr><td colspan="9" class="empty">Belum ada catatan stok pada filter ini.</td></tr>`;
   $("#sk-pager").innerHTML = pager;
-}
-function saldoList() {
-  const st = S.stk, q = st.q.trim().toLowerCase();
-  return S.products.filter(p => (st.cat === "Semua" || (st.cat === "Tanpa Kategori" ? !p.category : p.category === st.cat)) && (!q || (p.name + " " + (p.sku || "")).toLowerCase().includes(q)));
-}
-function updStkSel() {
-  const n = S.stk.sel.size, m = $("#stk-mass"); if (m) m.textContent = n ? `Edit Massal (${n})` : "Edit Massal";
-  const all = $("#sk-all"), l = saldoList(); if (all) all.checked = l.length > 0 && l.every(p => S.stk.sel.has(p.id));
-}
-function renderSaldoBody() {
-  const tb = $("#ss-body"); if (!tb) return;
-  const cols = saldoCols(), adm = can("stok_kelola"), { items, pager } = paginate(saldoList(), "ssaldo");
-  tb.innerHTML = items.length ? items.map(p => `<tr>${adm ? `<td><input type="checkbox" data-ssel="${p.id}" ${S.stk.sel.has(p.id) ? "checked" : ""}></td>` : ""}
-    <td><b>${esc(p.name)}</b><br><small style="color:var(--mute)">${esc(p.sku || "")}</small></td><td>${esc(p.category || "-")}</td>
-    ${cols.map(b => { const v = stockOf(p, b.key); return `<td class="n">${v < 0 ? `<span class="tag bad">${v}</span>` : v}</td>`; }).join("")}
-    <td style="white-space:nowrap"><button class="btn sm" data-stkadd="in" data-spid="${p.id}">＋</button> <button class="btn sm" data-stkadd="out" data-spid="${p.id}">－</button></td></tr>`).join("") : `<tr><td colspan="${cols.length + 4}" class="empty">Tidak ada produk.</td></tr>`;
-  $("#ss-pager").innerHTML = pager; updStkSel();
 }
 // Semua perubahan stok lewat sini: update saldo cabang + catat riwayat (siapa, kapan, sebelum/sesudah).
 async function applyStock(entries, src = "manual") {
@@ -1742,62 +1717,33 @@ async function applyStock(entries, src = "manual") {
   }
   return ops.length;
 }
-function openStockForm(type, pid) {
+function openStockForm(type) {
   const brs = stkBrs(); if (!brs.length) return toast("Tidak ada cabang aktif");
-  S.stk.ft = type;
+  S.stk.ft = type; S.stk.fq = {};
   modal(`<h2>Ubah Stok</h2>
-    <div class="form-group"><label>Kategori</label><select id="sf-cat"><option value="penyesuaian">Penyesuaian (manual)</option><option value="opname">Stok Opname (hitung fisik)</option></select></div>
-    <div class="seg" id="sf-seg" style="margin-bottom:14px"><button data-sft="in" aria-pressed="${type === "in"}">＋ Masuk</button><button data-sft="out" aria-pressed="${type === "out"}">－ Keluar</button></div>
-    <div class="form-group"><label>Produk</label><input id="sf-q" placeholder="Cari nama / SKU..." autocomplete="off"><select id="sf-p" size="5" style="margin-top:6px"></select></div>
-    <div class="form-row"><div class="form-group"><label>Cabang</label><select id="sf-br" ${brs.length < 2 ? "disabled" : ""}>${brs.map(b => `<option value="${esc(b.key)}" ${b.key === S.me.bk ? "selected" : ""}>${esc(b.name)}</option>`).join("")}</select></div>
-      <div class="form-group"><label id="sf-nl">Jumlah</label><input id="sf-n" type="number" step="1" inputmode="numeric"></div></div>
-    <div class="form-group"><label>Catatan (opsional)</label><input id="sf-note" maxlength="120" placeholder="mis. Restock supplier / rusak"></div>
-    <div id="sf-info" style="color:var(--mute); font-size:13px"></div>
-    <div class="dlg-actions"><button class="btn" data-close="1">Batal</button><button class="btn pri" id="sf-go">Simpan</button></div>`);
-  fillSf(pid); updSf();
+    <div class="seg" style="margin-bottom:14px"><button data-sft="in" aria-pressed="${type === "in"}">＋ Masuk</button><button data-sft="out" aria-pressed="${type === "out"}">－ Keluar</button></div>
+    <div class="form-group"><label>Cabang</label><select id="sf-br" ${brs.length < 2 ? "disabled" : ""}>${brs.map(b => `<option value="${esc(b.key)}" ${b.key === S.me.bk ? "selected" : ""}>${esc(b.name)}</option>`).join("")}</select></div>
+    <div class="form-group"><label>Produk & jumlah <span id="sf-cnt" style="font-weight:400"></span></label><input id="sf-q" placeholder="Cari nama / SKU..." autocomplete="off">
+      <div id="sf-list" class="wrap" style="max-height:42vh; overflow-y:auto; margin-top:6px"></div></div>
+    <div class="form-group"><label>Catatan (opsional, berlaku untuk semua produk)</label><input id="sf-note" maxlength="120" placeholder="mis. Restock supplier / rusak"></div>
+    <div class="dlg-actions"><button class="btn" data-close="1">Batal</button><button class="btn pri" id="sf-go">Simpan</button></div>`, true);
+  fillSf();
 }
-function fillSf(sel) {
-  const q = ($("#sf-q").value || "").toLowerCase(), cur = sel || $("#sf-p").value;
-  const l = S.products.filter(p => !q || (p.name + " " + (p.sku || "")).toLowerCase().includes(q)).slice(0, 200);
-  $("#sf-p").innerHTML = l.map(p => `<option value="${esc(p.id)}" ${p.id === cur ? "selected" : ""}>${esc(p.name)}${p.sku ? " · " + esc(p.sku) : ""}</option>`).join("");
-  if (!$("#sf-p").value && l[0] && q) $("#sf-p").value = l[0].id;
-}
-function updSf() {
-  const p = S.products.find(x => x.id === $("#sf-p").value), el = $("#sf-info"); if (!el) return;
-  const op = $("#sf-cat").value === "opname", raw = $("#sf-n").value, n = Math.round(+raw) || 0;
-  $("#sf-nl").textContent = op ? "Stok fisik (hasil hitung)" : "Jumlah"; $("#sf-seg").style.display = op ? "none" : "";
-  if (!p) { el.textContent = ""; return; }
-  const cur = stockOf(p, $("#sf-br").value), nw = op ? n : cur + (S.stk.ft === "in" ? n : -n);
-  el.innerHTML = `Stok sistem: <b>${cur}</b>${raw !== "" ? ` → setelah: <b style="color:${nw < 0 ? "var(--bad)" : "inherit"}">${nw}</b>${op ? ` (selisih ${nw - cur >= 0 ? "+" : ""}${nw - cur})` : ""}` : ""}`;
+function cntSf() { const n = Object.values(S.stk.fq).filter(v => v > 0).length; $("#sf-cnt").textContent = n ? `(${n} produk dipilih)` : ""; }
+function fillSf() {
+  const q = ($("#sf-q").value || "").toLowerCase(), bk = $("#sf-br").value;
+  const l = S.products.filter(p => !q || (p.name + " " + (p.sku || "")).toLowerCase().includes(q)).slice(0, 300);
+  $("#sf-list").innerHTML = l.length ? `<table><tbody>${l.map(p => `<tr><td><b>${esc(p.name)}</b><br><small style="color:var(--mute)">${p.sku ? esc(p.sku) + " · " : ""}stok ${stockOf(p, bk)}</small></td>
+    <td style="width:100px"><input type="number" min="1" step="1" inputmode="numeric" data-sfq="${esc(p.id)}" value="${S.stk.fq[p.id] || ""}" placeholder="Jumlah" style="padding:8px"></td></tr>`).join("")}</tbody></table>` : `<div class="empty">Produk tidak ditemukan.</div>`;
+  cntSf();
 }
 async function saveStockForm() {
-  const p = S.products.find(x => x.id === $("#sf-p").value), op = $("#sf-cat").value === "opname", raw = $("#sf-n").value, n = Math.round(+raw);
-  if (!p) return toast("Pilih produk terlebih dahulu");
-  if (raw === "" || isNaN(n) || (!op && n <= 0)) return toast(op ? "Isi stok fisik hasil hitung" : "Jumlah harus lebih dari 0");
+  const bk = $("#sf-br").value, note = $("#sf-note").value.trim();
+  const ents = Object.entries(S.stk.fq).filter(([, v]) => v > 0).map(([id, v]) => ({ p: S.products.find(x => x.id === id), bk, type: S.stk.ft, qty: v, note })).filter(e => e.p);
+  if (!ents.length) return toast("Isi jumlah minimal satu produk");
   const btn = $("#sf-go"); btn.disabled = true;
-  try { await applyStock([{ p, bk: $("#sf-br").value, type: op ? "set" : S.stk.ft, qty: n, cat: op ? "opname" : "penyesuaian", note: $("#sf-note").value.trim() }]); $("#dlg").close(); toast("Stok diperbarui"); if (S.tab === "stok" && S.stk.view === "hist") loadStock(); }
+  try { await applyStock(ents); $("#dlg").close(); toast(ents.length + " produk diperbarui"); if (S.tab === "stok") loadStock(); }
   catch (e) { toast("Gagal: " + errMsg(e)); btn.disabled = false; }
-}
-function openStockMass() {
-  const n = S.stk.sel.size;
-  if (!n) { S.stk.view = "saldo"; loadStock(); return toast("Pilih produk di Saldo Stok, lalu klik Edit Massal"); }
-  const brs = stkBrs();
-  modal(`<h2>Edit Massal Stok (${n} produk)</h2>
-    <div class="form-group"><label>Cabang</label><select id="sm-br">${brs.length > 1 ? `<option value="__all">Semua cabang aktif</option>` : ""}${brs.map(b => `<option value="${esc(b.key)}">${esc(b.name)}</option>`).join("")}</select></div>
-    <div class="form-group"><label>Kategori</label><select id="sm-c"><option value="penyesuaian">Penyesuaian (manual)</option><option value="opname">Stok Opname (atur sesuai hitung fisik)</option></select></div>
-    <div class="form-row"><div class="form-group"><label>Tindakan</label><select id="sm-t"><option value="in">Tambah stok (masuk)</option><option value="out">Kurangi stok (keluar)</option><option value="set">Atur stok menjadi</option></select></div>
-      <div class="form-group"><label>Jumlah</label><input id="sm-q" type="number" step="1" inputmode="numeric"></div></div>
-    <div class="form-group"><label>Catatan (opsional)</label><input id="sm-n" maxlength="120"></div>
-    <div class="dlg-actions"><button class="btn" data-close="1">Batal</button><button class="btn pri" id="sm-go">Terapkan</button></div>`);
-}
-async function applyStockMass() {
-  const cat = $("#sm-c").value, type = cat === "opname" ? "set" : $("#sm-t").value, q = Math.round(+$("#sm-q").value), v = $("#sm-br").value;
-  if ($("#sm-q").value === "" || isNaN(q) || (type !== "set" && q <= 0)) return toast("Isi jumlah dengan benar");
-  const bks = v === "__all" ? stkBrs().map(b => b.key) : [v], note = $("#sm-n").value.trim(), btn = $("#sm-go"); btn.disabled = true;
-  try {
-    const n = await applyStock(S.products.filter(p => S.stk.sel.has(p.id)).flatMap(p => bks.map(bk => ({ p, bk, type, qty: q, cat, note }))), "massal");
-    $("#dlg").close(); toast(n + " perubahan stok dicatat"); S.stk.sel.clear(); if (S.stk.view === "hist") loadStock(); else view();
-  } catch (e) { toast("Gagal: " + errMsg(e)); btn.disabled = false; }
 }
 function openMigrate() {
   const n = S.products.filter(p => typeof p.stock === "number").length;
@@ -1815,18 +1761,67 @@ async function runMigrate() {
   } catch (e) { toast("Gagal: " + errMsg(e)); btn.disabled = false; }
 }
 async function exportStock() {
+  const list = stkFiltered(); if (!list.length) return toast("Tidak ada riwayat untuk diekspor");
   try {
     const X = await xl(), wb = X.utils.book_new();
-    if (S.stk.view === "saldo") {
-      const cols = saldoCols(), src = S.stk.sel.size ? S.products.filter(p => S.stk.sel.has(p.id)) : saldoList();
-      addSheet(X, wb, "Saldo Stok", src.map(p => { const o = { ID: p.id, SKU: p.sku || "", Nama: p.name, Kategori: p.category || "" }; cols.forEach(b => o["Stok " + brShort(b)] = stockOf(p, b.key)); return o; }), { ID: "", SKU: "", Nama: "", Kategori: "" });
-      X.writeFile(wb, "saldo-stok-" + dkey(Date.now()) + ".xlsx"); toast(src.length + " produk diekspor");
-    } else {
-      const list = stkFiltered(); if (!list.length) return toast("Tidak ada riwayat untuk diekspor");
-      addSheet(X, wb, "Riwayat Stok", list.map(x => ({ Waktu: fmtDT(x.ts), Cabang: brName(x.bk), SKU: x.sku || "", Produk: x.pname, Kategori: KAT[katOf(x)], Jenis: !x.qty ? "Sesuai" : x.type === "in" ? "Masuk" : "Keluar", Jumlah: x.qty, "Stok Sebelum": x.before, "Stok Sesudah": x.after, Oleh: x.by, Catatan: x.note || "", Sumber: x.src || "manual" })));
-      X.writeFile(wb, `riwayat-stok-${S.stk.from}_${S.stk.to}.xlsx`); toast(list.length + " catatan diekspor");
-    }
+    addSheet(X, wb, "Riwayat Stok", list.map(x => ({ Waktu: fmtDT(x.ts), Cabang: brName(x.bk), SKU: x.sku || "", Produk: x.pname, Kategori: KAT[katOf(x)], Jenis: !x.qty ? "Sesuai" : x.type === "in" ? "Masuk" : "Keluar", Jumlah: x.qty, "Stok Sebelum": x.before, "Stok Sesudah": x.after, Oleh: x.by, Catatan: x.note || "" })));
+    X.writeFile(wb, `riwayat-stok-${S.stk.from}_${S.stk.to}.xlsx`); toast(list.length + " catatan diekspor");
   } catch (e) { toast("Gagal ekspor: " + errMsg(e)); }
+}
+
+// ==========================================
+// VIEW: STOK OPNAME
+// ==========================================
+const OP = { bk: "", q: "", vals: {}, note: "" };
+const opBk = () => (OP.bk && stkBrs().some(b => b.key === OP.bk) ? OP.bk : (stkBrs().find(b => b.key === S.me.bk) || stkBrs()[0] || {}).key);
+const opList = () => { const q = OP.q.trim().toLowerCase(); return S.products.filter(p => !q || (p.name + " " + (p.sku || "")).toLowerCase().includes(q)); };
+function opDiff(p) { const v = OP.vals[opBk() + "|" + p.id]; return v === undefined || v === "" ? null : Math.round(+v) - stockOf(p, opBk()); }
+function vOpname() {
+  const brs = stkBrs(), bk = opBk();
+  $("#view").innerHTML = `
+    <div class="panel">
+      <h2>Stok Opname ${S.all ? "" : "— " + esc(S.me.branch)}</h2>
+      <p style="color:var(--mute); margin-top:-8px">Isi stok real hasil hitung. Selisih dihitung otomatis terhadap stok di sistem. Produk yang dikosongkan dilewati. Saat disimpan, stok di sistem diganti dengan stok real dan tercatat di Riwayat Stok.</p>
+      <div class="filterbox"><div class="form-row" style="flex-wrap:wrap">
+        ${S.all && brs.length > 1 ? `<div class="form-group" style="margin:0"><label>Cabang</label><select id="op-br">${brs.map(b => `<option value="${esc(b.key)}" ${b.key === bk ? "selected" : ""}>${esc(b.name)}</option>`).join("")}</select></div>` : ""}
+        <div class="form-group" style="margin:0"><label>Cari produk</label><input id="op-q" placeholder="Nama / SKU..." value="${esc(OP.q)}"></div>
+        <div class="form-group" style="margin:0"><label>Catatan (opsional)</label><input id="op-n" maxlength="120" placeholder="mis. Opname akhir bulan" value="${esc(OP.note)}"></div></div></div>
+      <div id="op-sum" class="stats"></div>
+      <div class="wrap"><table><thead><tr><th>Produk</th><th class="n">Stok Sistem</th><th style="width:120px">Stok Real</th><th class="n">Selisih</th></tr></thead><tbody id="op-body"></tbody></table></div>
+      <div id="op-pager"></div>
+      <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin-top:16px"><button class="btn" data-opclr="1">Kosongkan isian</button><button class="btn pri" id="op-save">Simpan Hasil Opname</button></div>
+    </div>`;
+  renderOpBody();
+}
+function renderOpBody() {
+  const tb = $("#op-body"); if (!tb) return;
+  const { items, pager } = paginate(opList(), "op", 30), bk = opBk();
+  tb.innerHTML = items.length ? items.map(p => `<tr data-opr="${esc(p.id)}"><td><b>${esc(p.name)}</b><br><small style="color:var(--mute)">${esc(p.sku || "")}</small></td><td class="n os"></td>
+    <td><input type="number" step="1" min="0" inputmode="numeric" data-opv="${esc(p.id)}" value="${esc(OP.vals[bk + "|" + p.id] ?? "")}" style="padding:8px"></td><td class="n od"></td></tr>`).join("") : `<tr><td colspan="4" class="empty">Produk tidak ditemukan.</td></tr>`;
+  $("#op-pager").innerHTML = pager; updOp();
+}
+function updOp() {
+  const bk = opBk(); let plus = 0, minus = 0, n = 0, same = 0;
+  S.products.forEach(p => { const d = opDiff(p); if (d === null) return; n++; if (d > 0) plus += d; else if (d < 0) minus += d; else same++; });
+  document.querySelectorAll("[data-opr]").forEach(tr => {
+    const p = S.products.find(x => x.id === tr.dataset.opr); if (!p) return;
+    const d = opDiff(p), c = tr.querySelector(".od");
+    tr.querySelector(".os").textContent = stockOf(p, bk);
+    c.textContent = d === null ? "-" : (d > 0 ? "+" : "") + d; c.style.color = d > 0 ? "#166534" : d < 0 ? "var(--bad)" : "inherit"; c.style.fontWeight = "800";
+  });
+  const el = $("#op-sum");
+  if (el) el.innerHTML = `<div class="stat"><span>Produk dihitung</span><b>${n}</b></div><div class="stat"><span>Selisih lebih (+)</span><b style="color:#166534">+${plus}</b></div><div class="stat"><span>Selisih kurang (−)</span><b style="color:var(--bad)">${minus}</b></div><div class="stat"><span>Sesuai</span><b>${same}</b></div>`;
+}
+function saveOpname() {
+  const bk = opBk(), note = OP.note.trim();
+  const ents = S.products.filter(p => opDiff(p) !== null).map(p => ({ p, bk, type: "set", qty: Math.round(+OP.vals[bk + "|" + p.id]), cat: "opname", note }));
+  if (!ents.length) return toast("Isi stok real minimal satu produk");
+  if (ents.some(x => isNaN(x.qty) || x.qty < 0)) return toast("Stok real tidak boleh negatif");
+  const ch = ents.filter(x => x.qty !== stockOf(x.p, bk)).length;
+  customConfirm(`Terapkan opname ${brName(bk)} untuk ${ents.length} produk (${ch} berselisih)? Stok di sistem akan diganti dengan stok real.`, async () => {
+    try { await applyStock(ents, "opname"); ents.forEach(x => delete OP.vals[bk + "|" + x.p.id]); toast("Opname disimpan, stok disesuaikan"); renderOpBody(); }
+    catch (err) { toast("Gagal: " + errMsg(err)); }
+  });
 }
 
 // ==========================================
@@ -1844,12 +1839,11 @@ document.addEventListener("click", e => {
   else if (d.refresh) loadData();
   else if (d.expview) (S.tab === "laporan" ? exportLaporan() : exportRiwayat());
   else if (d.cartpop) openCartPop();
-  else if (d.stkview) { S.stk.view = d.stkview; loadStock(); }
-  else if (d.stkadd) openStockForm(d.stkadd, d.spid || "");
-  else if (d.sft) { S.stk.ft = d.sft; document.querySelectorAll("[data-sft]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.sft === d.sft))); updSf(); }
+  else if (d.stkadd) openStockForm(d.stkadd);
+  else if (d.sft) { S.stk.ft = d.sft; document.querySelectorAll("[data-sft]").forEach(x => x.setAttribute("aria-pressed", String(x.dataset.sft === d.sft))); }
   else if (t.id === "sf-go") saveStockForm();
-  else if (d.stkmass) openStockMass();
-  else if (t.id === "sm-go") applyStockMass();
+  else if (t.id === "op-save") saveOpname();
+  else if (d.opclr) { const bk = opBk(); Object.keys(OP.vals).filter(k => k.startsWith(bk + "|")).forEach(k => delete OP.vals[k]); renderOpBody(); }
   else if (d.stkexp) exportStock();
   else if (d.stkmig) openMigrate();
   else if (t.id === "mg-go") runMigrate();
@@ -1938,15 +1932,14 @@ document.addEventListener("input", e => {
   } else if (id === "sel-all") {
     prodFiltered().forEach(p => el.checked ? S.sel.add(p.id) : S.sel.delete(p.id)); renderProdTable();
   }
-  else if (el.dataset.ssel) { el.checked ? S.stk.sel.add(el.dataset.ssel) : S.stk.sel.delete(el.dataset.ssel); updStkSel(); }
-  else if (id === "sk-all") { saldoList().forEach(p => el.checked ? S.stk.sel.add(p.id) : S.stk.sel.delete(p.id)); renderSaldoBody(); }
   else if (id === "sk-prod") { S.stk.prod = el.value; S.pg.slog = 1; renderStkBody(); }
   else if (id === "sk-type") { S.stk.type = el.value; S.pg.slog = 1; renderStkBody(); }
   else if (id === "sk-kat") { S.stk.kat = el.value; S.pg.slog = 1; renderStkBody(); }
-  else if (id === "sm-c") { const t = $("#sm-t"); t.disabled = el.value === "opname"; if (t.disabled) t.value = "set"; }
-  else if (id === "sk-q") { S.stk.q = el.value; S.pg.ssaldo = 1; renderSaldoBody(); }
-  else if (id === "sk-cat") { S.stk.cat = el.value; S.pg.ssaldo = 1; renderSaldoBody(); }
-  else if (id.startsWith("sf-")) { if (id === "sf-q") fillSf(); updSf(); }
+  else if (el.dataset.sfq) { S.stk.fq[el.dataset.sfq] = Math.round(+el.value) || 0; cntSf(); }
+  else if (id === "sf-q" || id === "sf-br") fillSf();
+  else if (el.dataset.opv) { OP.vals[opBk() + "|" + el.dataset.opv] = el.value; updOp(); }
+  else if (id === "op-q") { OP.q = el.value; S.pg.op = 1; renderOpBody(); }
+  else if (id === "op-n") OP.note = el.value;
   else if (id === "q") { S.q = el.value; S.pg.kasir = 1; renderGrid(); }
   else if (id === "disc") { S.disc = +el.value || 0; renderCart(); renderPay(); }
   else if (id === "paid") { S.paid = el.value; updateChange(getCartData().total); }
@@ -1965,6 +1958,7 @@ document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id
 document.addEventListener("change", e => {
   const cid = e.target.id;
   if (cid === "sk-from" || cid === "sk-to") { S.stk[cid === "sk-from" ? "from" : "to"] = e.target.value; loadStock(); return; }
+  if (cid === "op-br") { OP.bk = e.target.value; renderOpBody(); return; }
   if (cid === "sk-br") { S.stk.br = e.target.value; loadStock(); return; }
   if (e.target.id === "imp-file" && e.target.files[0]) parseImport(e.target.files[0]);
   else if (e.target.id === "qr-file" && e.target.files[0]) uploadQris(e.target.files[0]);
