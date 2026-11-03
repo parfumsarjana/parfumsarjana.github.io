@@ -55,6 +55,7 @@ td button{padding:5px 10px;font-size:12px;margin:0 2px;border-radius:8px}td butt
 .bd{display:inline-block;padding:2px 9px;border-radius:99px;background:#f3f4f6;font-size:12px}.bd.ad2{background:var(--y)}
 #main .card{padding:6px 8px;border-radius:14px}#main .card:has(.kv),#main .card:has(.sg){padding:14px}
 @media(max-width:820px){.shell{grid-template-columns:1fr;gap:10px}.side{position:static;padding:8px}.nav{flex-direction:row;overflow-x:auto;scrollbar-width:none}.gl{display:none}.nv{width:auto;white-space:nowrap;padding:8px 12px}}
+.dg{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;color:var(--m);width:28px;text-align:center;font-size:18px}.dragging td{background:#fff8d6}
 .tb.fl{align-items:flex-end}.tb.fl>button,.tb.fl>select{margin:4px 0}#main .tb .two{grid-template-columns:repeat(2,150px)}
 .stk table{border-collapse:separate;border-spacing:0}
 .stk td:first-child,.stk th:first-child{position:sticky;left:0;z-index:1;min-width:170px;box-shadow:2px 0 4px -2px #0003}
@@ -77,6 +78,7 @@ const list=async(c,...w)=>(await getDocs(w.length?query(collection(db,c),...w):c
 const nowL=()=>new Date(Date.now()-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16);
 const fmtD=d=>d.toLocaleDateString('sv'),fr=n=>'Rp '+Math.round(n).toLocaleString('id-ID');
 const hrs=h=>h.inAt&&h.outAt?(new Date(h.outAt)-new Date(h.inAt))/36e5:0;
+const tcmp=(a,b)=>(a.order??1e9)-(b.order??1e9)||(a.time||'').localeCompare(b.time||'');
 const hav=(a,b,c,d)=>{const r=x=>x*Math.PI/180,x=Math.sin(r(c-a)/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(r(d-b)/2)**2;return 12742e3*Math.asin(Math.sqrt(x))};
 const tbl=(h,r)=>`<div class=sc><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${r.map(x=>`<tr>${x.map(c=>`<td>${c??''}</td>`).join('')}</tr>`).join('')}</table></div>`;
 const opts=(a,v)=>a.map(x=>`<option value="${esc(x[0])}"${x[0]==v?' selected':''}>${esc(x[1])}</option>`).join('');
@@ -155,7 +157,7 @@ const open=hist.find(h=>h.inAt&&!h.outAt);
 $('#app').className='';
 const pick=(a,ids)=>a.filter(x=>ids.includes(x.id));
 const L2=pick(locs,me.locIds||(me.locId?[me.locId]:[])),S2=pick(shs,me.shiftIds||(me.shiftId?[me.shiftId]:[]));
-const tdy=today(),tk0=tasks.filter(t=>(!t.created||t.created<=tdy)&&(!t.days?.length||t.days.includes(String(new Date().getDay())))).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+const tdy=today(),tk0=tasks.filter(t=>(!t.created||t.created<=tdy)&&(!t.days?.length||t.days.includes(String(new Date().getDay())))).sort(tcmp);
 const doneToday=hist.some(h=>h.date==tdy&&h.inAt);
 view(`<div class=top><button class=avb id=pf>${av(me.photo,me.name)}</button><div><b>${esc(me.name)}</b><br><small>${esc(me.position||'Staff')}</small></div></div>
 <div class=hi><h2>Halo 👋 ${esc((me.name||'').split(' ')[0])}</h2><p>Semangat kerja ya!</p></div>
@@ -217,6 +219,15 @@ view(`<div class=shell><aside class=side><div class=who><div><b>Absensi</b><smal
 document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{if(b.dataset.t=='absensi'&&tab!='absensi')AA=AB=today();tab=b.dataset.t;adminUI()});
 try{await TABS[tab]($('#main'))}catch(e){$('#main').innerHTML=`<p class=err>${esc(e.message)}</p>`}}
 
+function dragSort(m){const tb=m.querySelector('table');if(!tb)return;const trs=[...tb.querySelectorAll('tr')];if(trs.length<3)return;
+trs[0].insertAdjacentHTML('afterbegin','<th></th>');trs.slice(1).forEach(tr=>tr.insertAdjacentHTML('afterbegin','<td class=dg title="Tahan dan geser untuk ubah urutan">\u283F</td>'));
+const ids=()=>[...tb.querySelectorAll('td.dg')].map(h=>h.parentElement.querySelector('[data-e]').dataset.e);let cur=null,before='';
+tb.querySelectorAll('td.dg').forEach(h=>{h.onpointerdown=e=>{e.preventDefault();cur=h.parentElement;before=ids().join();cur.classList.add('dragging');h.setPointerCapture(e.pointerId)};
+h.onpointermove=e=>{if(!cur)return;const el=document.elementFromPoint(e.clientX,e.clientY),tr=el&&el.closest&&el.closest('tr');
+if(!tr||tr===cur||tr.parentElement!==cur.parentElement||tr.querySelector('th'))return;const r=tr.getBoundingClientRect();e.clientY<r.top+r.height/2?tr.before(cur):tr.after(cur)};
+const end=async()=>{if(!cur)return;cur.classList.remove('dragging');cur=null;const a=ids();if(a.join()==before)return;
+try{await Promise.all(a.map((id,i)=>setDoc(doc(db,'tasks',id),{order:i},{merge:true})))}catch(x){alert('Gagal menyimpan urutan: '+x.message);adminUI()}};
+h.onpointerup=end;h.onpointercancel=end})}
 async function manage(m,{c,t,f,rows,cols,head,id,pre,def={},stk}){
 m.insertAdjacentHTML('beforeend',`<div class=tb><button class=p id=ad>+ Tambah ${t}</button></div><div class="card${stk?' stk':''}">${tbl(head,rows.map(r=>[...cols(r),`<button data-e="${r.id}">Edit</button> <button data-d="${r.id}">Hapus</button>`]))}</div>`);
 const sv=async r=>{const o=await form(t,f,r||def);if(!o)return;pre&&pre(o,r);
@@ -281,11 +292,11 @@ m.insertAdjacentHTML('beforeend','<button id=ex>Export CSV</button>');$('#ex').o
 m.insertAdjacentHTML('beforeend',`<div class=card>${tbl(H,rows.map(r=>[esc(r[0]),...r.slice(1)]))}</div>`)},
 async tasks(m){const [st,tpl]=await Promise.all([list('staff'),list('taskTemplates')]);FS=FS||st[0]?.email||'';
 m.innerHTML=chips(st,FS);bindChips(m,v=>{FS=v;adminUI()});
-const rows=(await list('tasks',where('email','==',FS))).sort((a,b)=>(a.time||'').localeCompare(b.time||'')).map(r=>({...r,days:r.days?.length?r.days:DAYS}));
+const rows=(await list('tasks',where('email','==',FS))).sort(tcmp).map(r=>({...r,days:r.days?.length?r.days:DAYS}));
 const MD=[['add','Tambahkan ke tugas yang sudah ada'],['replace','Ganti semua tugas lama']],lbl=t=>(t.time?t.time+' ':'')+t.text+' ('+dayLbl(t.days)+')';
 const give=async(items,to,mode)=>{if(!items.length||!to.length)return;
 if(mode=='replace'){if(!confirm('Semua tugas lama staff tujuan akan dihapus. Lanjut?'))return;const all=await list('tasks');await Promise.all(all.filter(t=>to.includes(t.email)).map(t=>deleteDoc(doc(db,'tasks',t.id))))}
-await Promise.all(to.flatMap(e=>items.map(t=>setDoc(doc(collection(db,'tasks')),{email:e,text:t.text,time:t.time||'',days:t.days||DAYS,created:today()}))));
+await Promise.all(to.flatMap(e=>items.map((t,i)=>setDoc(doc(collection(db,'tasks')),{email:e,text:t.text,time:t.time||'',days:t.days||DAYS,created:today(),order:Date.now()+i}))));
 alert(items.length+' tugas masuk ke '+to.length+' staff');adminUI()};
 m.insertAdjacentHTML('beforeend','<div class=tb><button id=cp>Salin ke staff lain</button><button id=tv>Simpan jadi template</button><button id=tu>Pakai template</button><button id=tx>Hapus template</button></div>');
 $('#cp').onclick=async()=>{if(!rows.length)return alert('Belum ada tugas untuk disalin');
@@ -298,7 +309,8 @@ const o=await form('Pakai template tugas',[['tpl','Template','select',tpl.map(t=
 if(o)await give(tpl.find(t=>t.id==o.tpl)?.items||[],o.to,o.mode)};
 $('#tx').onclick=async()=>{if(!tpl.length)return alert('Belum ada template');const o=await form('Hapus template',[['tpl','Template','select',tpl.map(t=>[t.id,t.name])]]);
 if(o&&confirm('Hapus template ini?')){await deleteDoc(doc(db,'taskTemplates',o.tpl));adminUI()}};
-await manage(m,{c:'tasks',t:'Tugas',head:['Jam','Tugas','Hari',''],rows,f:[['text','Tugas'],['time','Jam bisa dikerjakan (kosong = kapan saja)','time'],['days','Hari tugas ini muncul','check',DAYN]],cols:r=>[r.time||'-',esc(r.text),dayLbl(r.days)],pre:(o,r)=>{o.email=FS;if(!o.days.length)o.days=DAYS;if(!r)o.created=today()},def:{days:DAYS}})},
+await manage(m,{c:'tasks',t:'Tugas',head:['Jam','Tugas','Hari',''],rows,f:[['text','Tugas'],['time','Jam bisa dikerjakan (kosong = kapan saja)','time'],['days','Hari tugas ini muncul','check',DAYN]],cols:r=>[r.time||'-',esc(r.text),dayLbl(r.days)],pre:(o,r)=>{o.email=FS;if(!o.days.length)o.days=DAYS;if(!r){o.created=today();o.order=Date.now()}},def:{days:DAYS}});
+dragSort(m)},
 async taskhist(m){const [st,tk,lg]=await Promise.all([list('staff'),list('tasks'),list('taskLog')]);
 m.innerHTML=chips(st,FS,1)+`<div class="tb fl"><select id=ts style="width:auto"><option value="">Semua status</option><option value=1${TS=='1'?' selected':''}>Selesai</option><option value=0${TS=='0'?' selected':''}>Belum selesai</option></select>`+rng(DA,DB)+`</div>`;
 bindChips(m,v=>{FS=v;adminUI()});bindRng(m,adminUI);$('#ts').onchange=e=>{TS=e.target.value;adminUI()};
