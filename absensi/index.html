@@ -94,14 +94,14 @@ const dayLbl=d=>!d?.length||d.length==7?'Setiap hari':DAYN.filter(x=>d.includes(
 const PL={hour:'Per jam',day:'Per hari',shift:'Per shift',month:'Per bulan',custom:'Custom'};
 const summ=(email,att,tk,lg,shs,mo)=>{const [y,m]=mo.split('-').map(Number),S=mo+'-01',last=fmtD(new Date(y,m,0)),E=last<today()?last:today();
 const a=att.filter(x=>x.email==email&&x.date>=S&&x.date<=E&&x.inAt),late=a.filter(x=>{const sh=shs.find(s=>s.id==x.shiftId);return sh&&x.inAt.slice(11)>sh.start}).length;
-const tr=taskRows(tk.filter(t=>t.email==email),lg,S,E);
+const tr=taskRows(tk.filter(t=>t.email==email),lg,S,E,att);
 return {days:new Set(a.map(x=>x.date)).size,n:a.length,late,jam:a.reduce((n,x)=>n+hrs(x),0),noOut:a.filter(x=>!x.outAt).length,tt:tr.length,td:tr.filter(r=>r.done).length}};
 const tiles=r=>`<div class=sg>${[[r.days,'Hari masuk'],[r.n-r.late,'Tepat waktu'],[r.late,'Tidak tepat waktu'],[r.jam.toFixed(1),'Total jam kerja'],[r.noOut,'Belum absen pulang'],[r.td+' / '+r.tt,'Tugas selesai'],[r.tt-r.td,'Tugas tidak selesai']].map(([v,l])=>`<div><b>${v}</b><small>${l}</small></div>`).join('')}</div>`;
 const csv=(n,h,r)=>{const q=x=>'"'+String(x??'').replace(/"/g,'""')+'"',b=new Blob(['\ufeff'+[h,...r].map(l=>l.map(q).join(',')).join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n+'.csv';a.click()};
 const parseCSV=t=>{t=t.replace(/^\ufeff/,'');const l0=t.split(/\r?\n/)[0],d=l0.split(';').length>l0.split(',').length?';':',',R=[];let r=[],c='',q=0;
 for(let i=0;i<t.length;i++){const ch=t[i];if(q){if(ch=='"'){if(t[i+1]=='"'){c+='"';i++}else q=0}else c+=ch}else if(ch=='"')q=1;else if(ch==d){r.push(c);c=''}else if(ch=='\n'||ch=='\r'){if(ch=='\r'&&t[i+1]=='\n')i++;r.push(c);c='';R.push(r);r=[]}else c+=ch}
 if(c||r.length){r.push(c);R.push(r)}return R.filter(x=>x.some(y=>y.trim()))};
-const taskRows=(tk,lg,a,b)=>{const o=[];for(let d=new Date(a+'T00:00');fmtD(d)<=b&&o.length<3000;d.setDate(d.getDate()+1)){const ds=fmtD(d);tk.forEach(t=>{if(t.created&&ds<t.created)return;if(t.days?.length&&!t.days.includes(String(d.getDay())))return;const l=lg.find(x=>x.id==t.id+'_'+ds);o.push({email:t.email,text:t.text,time:t.time,date:ds,done:!!l?.done,doneAt:l?.doneAt||''})})}return o};
+const taskRows=(tk,lg,a,b,att)=>{const o=[];for(let d=new Date(a+'T00:00');fmtD(d)<=b&&o.length<3000;d.setDate(d.getDate()+1)){const ds=fmtD(d);tk.forEach(t=>{if(t.created&&ds<t.created)return;if(t.days?.length&&!t.days.includes(String(d.getDay())))return;if(t.shiftIds?.length&&att&&!att.some(x=>x.email==t.email&&x.date==ds&&x.inAt&&t.shiftIds.includes(x.shiftId)))return;const l=lg.find(x=>x.id==t.id+'_'+ds);o.push({email:t.email,text:t.text,time:t.time,date:ds,done:!!l?.done,doneAt:l?.doneAt||''})})}return o};
 window.out=()=>signOut(auth);
 const bar=()=>`<div class="card bar"><b>Absensi</b><span>${esc(me?.name)} · ${me?.role||''}</span><button onclick="out()">Keluar</button></div>`;
 
@@ -157,7 +157,7 @@ const open=hist.find(h=>h.inAt&&!h.outAt);
 $('#app').className='';
 const pick=(a,ids)=>a.filter(x=>ids.includes(x.id));
 const L2=pick(locs,me.locIds||(me.locId?[me.locId]:[])),S2=pick(shs,me.shiftIds||(me.shiftId?[me.shiftId]:[]));
-const tdy=today(),tk0=tasks.filter(t=>(!t.created||t.created<=tdy)&&(!t.days?.length||t.days.includes(String(new Date().getDay())))).sort(tcmp);
+const tdy=today(),tk00=tasks.filter(t=>(!t.created||t.created<=tdy)&&(!t.days?.length||t.days.includes(String(new Date().getDay())))).sort(tcmp),tsh=hist.filter(h=>h.inAt&&(h.date==tdy||!h.outAt)).map(h=>h.shiftId),tk0=tk00.filter(t=>!t.shiftIds?.length||t.shiftIds.some(i=>tsh.includes(i))),pend=tsh.length?0:tk00.length-tk0.length;
 const doneToday=hist.some(h=>h.date==tdy&&h.inAt);
 view(`<div class=top><button class=avb id=pf>${av(me.photo,me.name)}</button><div><b>${esc(me.name)}</b><br><small>${esc(me.position||'Staff')}</small></div></div>
 <div class=hi><h2>Halo 👋 ${esc((me.name||'').split(' ')[0])}</h2><p>Semangat kerja ya!</p></div>
@@ -172,11 +172,11 @@ if(!confirm('Tandai tugas ini selesai? Tidak bisa dibatalkan.'))return;
 const rec={email:em,name:me.name,taskId:k,text:t.text,time:t.time||'',date:tdy,done:true,doneAt:nowL().slice(11)};
 try{await setDoc(doc(db,'taskLog',id),rec);lg.push({id,...rec});drawT();draw()}catch(e){alert(e.message)}};
 const drawT=()=>{$('#tl').innerHTML=tk0.map(t=>{const l=lg.find(x=>x.id==t.id+'_'+tdy),d=l?.done,lock=!d&&t.time&&nowL().slice(11)<t.time;
-return `<div class="tc${d?' done':''}${lock?' lock':''}" data-k="${t.id}"><div><b>${esc(t.text)}</b><br><small>${d?'✓ Selesai '+l.doneAt:lock?'Bisa dikerjakan jam '+t.time:'Ketuk untuk menandai selesai'}</small></div><span>${t.time||''}</span></div>`}).join('')||'<p>Tidak ada tugas hari ini.</p>';
+return `<div class="tc${d?' done':''}${lock?' lock':''}" data-k="${t.id}"><div><b>${esc(t.text)}</b><br><small>${d?'✓ Selesai '+l.doneAt:lock?'Bisa dikerjakan jam '+t.time:'Ketuk untuk menandai selesai'}</small></div><span>${t.time||''}</span></div>`}).join('')||'<p>Tidak ada tugas hari ini.</p>';if(pend)$('#tl').insertAdjacentHTML('beforeend','<p><small>'+pend+' tugas khusus shift akan muncul setelah Anda absen masuk.</small></p>');
 document.querySelectorAll('.tc').forEach(c=>c.onclick=()=>tog(c.dataset.k))};
 let sec='r';
 const draw=()=>{const p=$('#pn');let h='';
-if(sec=='h')h=rng(DA,DB)+tbl(['Tanggal','Tugas','Jam','Status','Selesai'],taskRows(tasks,lg,DA,DB).sort((a,b)=>b.date.localeCompare(a.date)).map(r=>[r.date,esc(r.text),r.time||'-',r.done?'<b class=ok>Selesai</b>':'<span class=err>Belum</span>',r.doneAt]));
+if(sec=='h')h=rng(DA,DB)+tbl(['Tanggal','Tugas','Jam','Status','Selesai'],taskRows(tasks,lg,DA,DB,hist).sort((a,b)=>b.date.localeCompare(a.date)).map(r=>[r.date,esc(r.text),r.time||'-',r.done?'<b class=ok>Selesai</b>':'<span class=err>Belum</span>',r.doneAt]));
 else if(sec=='r')h=rng(DA,DB)+tbl(['Tanggal','Shift','Lokasi','Masuk','Keluar','Jam'],hist.filter(x=>x.date>=DA&&x.date<=DB).map(x=>[x.date,esc(x.shiftName),esc(x.locName),(x.inAt||'').slice(11),(x.outAt||'').slice(11),hrs(x).toFixed(1)]));
 else h=`<label>Bulan<input type=month id=mo value="${MO}"></label>`+tiles(summ(em,hist,tasks,lg,shs,MO));
 p.innerHTML=`<div class=card>${h}</div>`;
@@ -290,31 +290,31 @@ const H=['Nama','Hari masuk','Tepat waktu','Tidak tepat waktu','Total jam','Belu
 const rows=st.filter(s=>!FS||s.email==FS).map(s=>{const r=summ(s.email,att,tk,lg,sh,MO);return [s.name,r.days,r.n-r.late,r.late,r.jam.toFixed(1),r.noOut,r.td,r.tt-r.td]});
 m.insertAdjacentHTML('beforeend','<button id=ex>Export CSV</button>');$('#ex').onclick=()=>csv('summary-'+MO,H,rows);
 m.insertAdjacentHTML('beforeend',`<div class=card>${tbl(H,rows.map(r=>[esc(r[0]),...r.slice(1)]))}</div>`)},
-async tasks(m){const [st,tpl]=await Promise.all([list('staff'),list('taskTemplates')]);FS=FS||st[0]?.email||'';
+async tasks(m){const [st,tpl,shl]=await Promise.all([list('staff'),list('taskTemplates'),list('shifts')]);FS=FS||st[0]?.email||'';
 m.innerHTML=chips(st,FS);bindChips(m,v=>{FS=v;adminUI()});
 const rows=(await list('tasks',where('email','==',FS))).sort(tcmp).map(r=>({...r,days:r.days?.length?r.days:DAYS}));
 const MD=[['add','Tambahkan ke tugas yang sudah ada'],['replace','Ganti semua tugas lama']],lbl=t=>(t.time?t.time+' ':'')+t.text+' ('+dayLbl(t.days)+')';
 const give=async(items,to,mode)=>{if(!items.length||!to.length)return;
 if(mode=='replace'){if(!confirm('Semua tugas lama staff tujuan akan dihapus. Lanjut?'))return;const all=await list('tasks');await Promise.all(all.filter(t=>to.includes(t.email)).map(t=>deleteDoc(doc(db,'tasks',t.id))))}
-await Promise.all(to.flatMap(e=>items.map((t,i)=>setDoc(doc(collection(db,'tasks')),{email:e,text:t.text,time:t.time||'',days:t.days||DAYS,created:today(),order:Date.now()+i}))));
+await Promise.all(to.flatMap(e=>items.map((t,i)=>setDoc(doc(collection(db,'tasks')),{email:e,text:t.text,time:t.time||'',days:t.days||DAYS,shiftIds:t.shiftIds||[],created:today(),order:Date.now()+i}))));
 alert(items.length+' tugas masuk ke '+to.length+' staff');adminUI()};
 m.insertAdjacentHTML('beforeend','<div class=tb><button id=cp>Salin ke staff lain</button><button id=tv>Simpan jadi template</button><button id=tu>Pakai template</button><button id=tx>Hapus template</button></div>');
 $('#cp').onclick=async()=>{if(!rows.length)return alert('Belum ada tugas untuk disalin');
 const o=await form('Salin tugas ke staff lain',[['pick','Tugas yang disalin','check',rows.map(r=>[r.id,lbl(r)])],['to','Staff tujuan','check',st.filter(s=>s.email!=FS).map(s=>[s.email,s.name])],['mode','Cara','select',MD]],{pick:rows.map(r=>r.id)});
 if(o)await give(rows.filter(r=>o.pick.includes(r.id)),o.to,o.mode)};
 $('#tv').onclick=async()=>{if(!rows.length)return alert('Belum ada tugas untuk dijadikan template');const n=prompt('Nama template (mis. Kasir pagi)');if(!n)return;
-await setDoc(doc(collection(db,'taskTemplates')),{name:n,items:rows.map(r=>({text:r.text,time:r.time||'',days:r.days}))});alert('Template "'+n+'" disimpan');adminUI()};
+await setDoc(doc(collection(db,'taskTemplates')),{name:n,items:rows.map(r=>({text:r.text,time:r.time||'',days:r.days,shiftIds:r.shiftIds||[]}))});alert('Template "'+n+'" disimpan');adminUI()};
 $('#tu').onclick=async()=>{if(!tpl.length)return alert('Belum ada template. Buat dulu lewat "Simpan jadi template"');
 const o=await form('Pakai template tugas',[['tpl','Template','select',tpl.map(t=>[t.id,`${t.name} (${t.items.length} tugas)`])],['to','Staff tujuan','check',st.map(s=>[s.email,s.name])],['mode','Cara','select',MD]],{to:[FS]});
 if(o)await give(tpl.find(t=>t.id==o.tpl)?.items||[],o.to,o.mode)};
 $('#tx').onclick=async()=>{if(!tpl.length)return alert('Belum ada template');const o=await form('Hapus template',[['tpl','Template','select',tpl.map(t=>[t.id,t.name])]]);
 if(o&&confirm('Hapus template ini?')){await deleteDoc(doc(db,'taskTemplates',o.tpl));adminUI()}};
-await manage(m,{c:'tasks',t:'Tugas',head:['Jam','Tugas','Hari',''],rows,f:[['text','Tugas'],['time','Jam bisa dikerjakan (kosong = kapan saja)','time'],['days','Hari tugas ini muncul','check',DAYN]],cols:r=>[r.time||'-',esc(r.text),dayLbl(r.days)],pre:(o,r)=>{o.email=FS;if(!o.days.length)o.days=DAYS;if(!r){o.created=today();o.order=Date.now()}},def:{days:DAYS}});
+await manage(m,{c:'tasks',t:'Tugas',head:['Jam','Tugas','Hari','Shift',''],rows,f:[['text','Tugas'],['time','Jam bisa dikerjakan (kosong = kapan saja)','time'],['days','Hari tugas ini muncul','check',DAYN],['shiftIds','Khusus shift (kosong = tanpa shift, muncul di semua shift)','check',shl.map(x=>[x.id,`${x.name} (${x.start}-${x.end})`])]],cols:r=>[r.time||'-',esc(r.text),dayLbl(r.days),(r.shiftIds||[]).map(i=>shl.find(x=>x.id==i)?.name).filter(Boolean).map(esc).join(', ')||'Tanpa shift'],pre:(o,r)=>{o.email=FS;if(!o.days.length)o.days=DAYS;if(!r){o.created=today();o.order=Date.now()}},def:{days:DAYS,shiftIds:[]}});
 dragSort(m)},
-async taskhist(m){const [st,tk,lg]=await Promise.all([list('staff'),list('tasks'),list('taskLog')]);
+async taskhist(m){const [st,tk,lg,att]=await Promise.all([list('staff'),list('tasks'),list('taskLog'),list('attendance')]);
 m.innerHTML=chips(st,FS,1)+`<div class="tb fl"><select id=ts style="width:auto"><option value="">Semua status</option><option value=1${TS=='1'?' selected':''}>Selesai</option><option value=0${TS=='0'?' selected':''}>Belum selesai</option></select>`+rng(DA,DB)+`</div>`;
 bindChips(m,v=>{FS=v;adminUI()});bindRng(m,adminUI);$('#ts').onchange=e=>{TS=e.target.value;adminUI()};
-const rows=taskRows(tk.filter(t=>!FS||t.email==FS),lg,DA,DB).filter(r=>!TS||r.done==(TS=='1')).sort((a,b)=>b.date.localeCompare(a.date));
+const rows=taskRows(tk.filter(t=>!FS||t.email==FS),lg,DA,DB,att).filter(r=>!TS||r.done==(TS=='1')).sort((a,b)=>b.date.localeCompare(a.date));
 m.insertAdjacentHTML('beforeend','<button id=ex>Export CSV</button>');$('#ex').onclick=()=>csv('riwayat-tugas',['Tanggal','Staff','Tugas','Jam','Status','Selesai pada'],rows.map(r=>[r.date,st.find(s=>s.email==r.email)?.name,r.text,r.time,r.done?'Selesai':'Belum',r.doneAt]));
 m.insertAdjacentHTML('beforeend',`<div class=card>${tbl(['Tanggal','Staff','Tugas','Jam','Status','Selesai pada'],rows.map(r=>[r.date,esc(st.find(s=>s.email==r.email)?.name),esc(r.text),r.time||'-',r.done?'<b class=ok>Selesai</b>':'<span class=err>Belum</span>',r.doneAt]))}</div>`)},
 async cutoffs(m){const rows=await list('cutoffs');await manage(m,{c:'cutoffs',t:'Cut Off',head:['Nama','Tanggal cut off',''],rows,f:[['name','Nama cut off (mis. Bulanan tgl 25)'],['day','Tanggal cut off (1-31)','number']],cols:r=>[esc(r.name),r.day],def:{day:25}})},
