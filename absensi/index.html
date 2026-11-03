@@ -309,15 +309,15 @@ async cutoffs(m){const rows=await list('cutoffs');await manage(m,{c:'cutoffs',t:
 async payroll(m){PM=PM||today().slice(0,7);const [y,mm]=PM.split('-').map(Number);const cfg=await getCfg();
 const [st,att,adj,cos,its,hol,lv,pps]=await Promise.all([list('staff'),list('attendance'),list('adjust'),list('cutoffs'),list('adjItems',where('period','==',PM)),list('holidays'),list('leaves'),listPP()]);
 const end=(c,Y,M)=>new Date(Y,M,Math.min(c,new Date(Y,M+1,0).getDate())),td=today(),yd=fmtD(new Date(Date.now()-864e5)),isHol=ds=>hol.some(h=>ds>=h.from&&ds<=(h.to||h.from)),isOff=ds=>cfg.offDays.includes(String(new Date(ds+'T00:00').getDay()));
-const hh=x=>{let v=hrs(x);const r=+cfg.hourRound;if(r>0){const u=r/60;v=Math.floor(v/u+1e-9)*u}const mx=+cfg.hourMax;if(mx>0)v=Math.min(v,mx);return v*((isHol(x.date)||isOff(x.date))?(+cfg.holMult||1):1)};
+const dh=(a,r,mx,mul)=>{const m={};for(const x of a){let v=hrs(x);if(r>0){const u=r/60;v=Math.floor(v/u+1e-9)*u}if(mx>0)v=Math.min(v,mx);m[x.date]=(m[x.date]||0)+v}return Object.keys(m).reduce((n,d)=>n+Math.floor(m[d]+1e-9)*(mul&&(isHol(d)||isOff(d))?(+cfg.holMult||1):1),0)};
 const rows=st.map(p=>{const c=cos.find(x=>x.id==p.cutoffId),co=c?.day||25,S=fmtD(new Date(end(co,y,mm-2).getTime()+864e5)),E=fmtD(end(co,y,mm-1)),t=p.payType||'hour',rt=p.rate||0;
 const nd=Math.round((new Date(E+'T00:00')-new Date(S+'T00:00'))/864e5)+1,div=+cfg.fixedDiv||nd;
-const a=att.filter(x=>x.email==p.email&&x.date>=S&&x.date<=E&&x.outAt),h=a.reduce((n,x)=>n+hrs(x),0),hp=a.reduce((n,x)=>n+hh(x),0),d=new Set(a.map(x=>x.date)).size;
+const a=att.filter(x=>x.email==p.email&&x.date>=S&&x.date<=E&&x.outAt),h=dh(a,0,0,false),hp=dh(a,+cfg.hourRound,+cfg.hourMax,true),d=new Set(a.map(x=>x.date)).size;
 const pr=t=='custom'?pps.find(x=>x.id==p.payProfileId):null;let cH=0,cRate=0,cDiv=0;
 if(pr){const dm=pr.divMode||'period';cDiv=dm=='fixed'?(+pr.divFixed||nd):dm=='month'?new Date(y,mm,0).getDate():nd;
 if(dm!='fixed'&&pr.subOff=='1'){let c=0;for(let dd=new Date(S+'T00:00');fmtD(dd)<=E;dd.setDate(dd.getDate()+1)){const ds=fmtD(dd);if(isHol(ds)||isOff(ds))c++}cDiv=Math.max(1,cDiv-c)}
 cRate=(+pr.amount||0)/cDiv/(+pr.hoursPerDay||1);
-cH=a.reduce((n,x)=>{let v=hrs(x);const r=+pr.hourRound;if(r>0){const u=r/60;v=Math.floor(v/u+1e-9)*u}const mx=+pr.hourMax;if(mx>0)v=Math.min(v,mx);return n+v},0)}
+cH=dh(a,+pr.hourRound,+pr.hourMax,false)}
 const base=t=='custom'?cH*cRate:t=='shift'?a.length*rt/div:t=='month'?rt:t=='day'?d*rt:hp*rt;
 let abs=0,sick=0,cut=0;
 if(t=='month'){const lim=E<td?E:yd,pres=new Set(att.filter(x=>x.email==p.email&&x.inAt).map(x=>x.date)),sk=ds=>lv.some(l=>l.email==p.email&&ds>=l.from&&ds<=(l.to||l.from));
