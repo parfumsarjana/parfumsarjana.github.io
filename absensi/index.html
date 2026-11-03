@@ -227,10 +227,11 @@ m.querySelectorAll('[data-d]').forEach(b=>b.onclick=async()=>{if(confirm('Hapus 
 
 const CFG0={fixedDiv:0,offDays:['0'],prorata:'1',sickPct:0,hourRound:'0',hourMax:0,holMult:1};let PY=today().slice(0,4);
 const getCfg=async()=>{const d=await getDoc(doc(db,'settings','payroll'));return {...CFG0,...(d.exists()?d.data():{})}};
+const PPERR={v:0},listPP=async()=>{try{PPERR.v=0;return await list('payProfiles')}catch(e){PPERR.v=1;return []}};
 const MN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const PT=[['hour','Per jam'],['day','Per hari'],['shift','Per shift (total gaji bulanan ÷ jumlah hari)'],['month','Per bulan (potong prorata jika tidak masuk)'],['custom','Aturan custom (pilih aturan di bawah)']];
 const TABS={
-async staff(m){const [rows,pos,sh,lo,co,pp]=await Promise.all([list('staff'),list('positions'),list('shifts'),list('locations'),list('cutoffs'),list('payProfiles')]);
+async staff(m){const [rows,pos,sh,lo,co,pp]=await Promise.all([list('staff'),list('positions'),list('shifts'),list('locations'),list('cutoffs'),listPP()]);
 const nm=(a,i)=>esc(a.find(x=>x.id==i)?.name);
 await manage(m,{c:'staff',t:'Staff',head:['Nama','No HP','Posisi','Lokasi','Shift','Gaji','Role',''],rows,
 f:[['name','Nama lengkap'],['phone','No HP','tel'],['email','Email','email'],['nik','NIK'],['gender','Jenis kelamin','select',[['','-'],['L','Laki-laki'],['P','Perempuan']]],['birthPlace','Tempat lahir'],['birthDate','Tanggal lahir','date'],['address','Alamat tempat tinggal'],['emergency','Kontak darurat (nama & no HP)'],['startDate','Mulai bekerja','date'],['role','Role','select',[['staff','Staff'],['admin','Admin']]],['position','Posisi','select',[['','-'],...pos.map(p=>[p.name,p.name])]],['locIds','Lokasi kerja (boleh lebih dari satu)','check',lo.map(l=>[l.id,l.name])],['shiftIds','Shift (boleh lebih dari satu)','check',sh.map(s=>[s.id,s.name])],['cutoffId','Cut off','select',[['','- (default tgl 25)'],...co.map(c=>[c.id,c.name])]],['payType','Tipe gaji','select',PT],['payProfileId','Aturan gaji custom (dipakai jika Tipe gaji = Aturan custom)','select',[['','-'],...pp.map(p=>[p.id,p.name])]],['rate','Gaji (Rp): per jam / per hari / TOTAL per bulan (untuk Per shift & Per bulan)','number']],
@@ -306,7 +307,7 @@ m.insertAdjacentHTML('beforeend','<button id=ex>Export CSV</button>');$('#ex').o
 m.insertAdjacentHTML('beforeend',`<div class=card>${tbl(['Tanggal','Staff','Tugas','Jam','Status','Selesai pada'],rows.map(r=>[r.date,esc(st.find(s=>s.email==r.email)?.name),esc(r.text),r.time||'-',r.done?'<b class=ok>Selesai</b>':'<span class=err>Belum</span>',r.doneAt]))}</div>`)},
 async cutoffs(m){const rows=await list('cutoffs');await manage(m,{c:'cutoffs',t:'Cut Off',head:['Nama','Tanggal cut off',''],rows,f:[['name','Nama cut off (mis. Bulanan tgl 25)'],['day','Tanggal cut off (1-31)','number']],cols:r=>[esc(r.name),r.day],def:{day:25}})},
 async payroll(m){PM=PM||today().slice(0,7);const [y,mm]=PM.split('-').map(Number);const cfg=await getCfg();
-const [st,att,adj,cos,its,hol,lv,pps]=await Promise.all([list('staff'),list('attendance'),list('adjust'),list('cutoffs'),list('adjItems',where('period','==',PM)),list('holidays'),list('leaves'),list('payProfiles')]);
+const [st,att,adj,cos,its,hol,lv,pps]=await Promise.all([list('staff'),list('attendance'),list('adjust'),list('cutoffs'),list('adjItems',where('period','==',PM)),list('holidays'),list('leaves'),listPP()]);
 const end=(c,Y,M)=>new Date(Y,M,Math.min(c,new Date(Y,M+1,0).getDate())),td=today(),yd=fmtD(new Date(Date.now()-864e5)),isHol=ds=>hol.some(h=>ds>=h.from&&ds<=(h.to||h.from)),isOff=ds=>cfg.offDays.includes(String(new Date(ds+'T00:00').getDay()));
 const hh=x=>{let v=hrs(x);const r=+cfg.hourRound;if(r>0){const u=r/60;v=Math.floor(v/u+1e-9)*u}const mx=+cfg.hourMax;if(mx>0)v=Math.min(v,mx);return v*((isHol(x.date)||isOff(x.date))?(+cfg.holMult||1):1)};
 const rows=st.map(p=>{const c=cos.find(x=>x.id==p.cutoffId),co=c?.day||25,S=fmtD(new Date(end(co,y,mm-2).getTime()+864e5)),E=fmtD(end(co,y,mm-1)),t=p.payType||'hour',rt=p.rate||0;
@@ -358,7 +359,8 @@ ${kv('Per shift','Total gaji bulanan ÷ pembagi × jumlah shift masuk')}
 $('#py').onchange=e=>{PY=e.target.value||PY;adminUI()};
 $('#cf').onclick=async()=>{const o=await form('Aturan gaji',sf,cfg);if(o){await setDoc(doc(db,'settings','payroll'),o);adminUI()}};
 $('#h5').innerHTML='<h3>Aturan gaji custom</h3><small>Buat jenis gaji sendiri (mis. Gaji anak store), lalu pilih di data Staff dengan Tipe gaji = Aturan custom. Gaji per jam = gaji bulanan ÷ pembagi hari ÷ jam kerja per hari, dikali total jam masuk.</small>';
-const pp=await list('payProfiles'),DL={period:'hari periode cut off',month:'hari bulan kalender'};
+const pp=await listPP(),DL={period:'hari periode cut off',month:'hari bulan kalender'};
+if(PPERR.v)$('#h5').insertAdjacentHTML('beforeend','<p class=err>Aturan gaji custom belum bisa diakses: tambahkan izin Firestore Rules untuk koleksi <b>payProfiles</b> (samakan dengan aturan koleksi holidays), lalu muat ulang.</p>');
 await manage($('#h5'),{c:'payProfiles',t:'Aturan Gaji',head:['Nama','Gaji per bulan','Rumus',''],rows:pp,
 f:[['name','Nama aturan gaji (mis. Gaji anak store)'],['amount','Gaji per bulan (Rp)','number'],['divMode','Pembagi hari','select',[['period','Jumlah hari periode cut off (28/29/30/31)'],['month','Jumlah hari bulan kalender payroll'],['fixed','Angka tetap']]],['divFixed','Angka pembagi tetap (hanya dipakai jika Pembagi = Angka tetap)','number'],['hoursPerDay','Jam kerja per hari','number'],['subOff','Kurangi hari libur dari pembagi','select',[['0','Tidak (tanpa hari libur)'],['1','Ya (libur rutin dan libur nasional)']]],['hourRound','Pembulatan jam kerja ke bawah','select',[['0','Tanpa pembulatan'],['15','15 menit'],['30','30 menit'],['60','1 jam']]],['hourMax','Batas jam dibayar per absen (0 = tanpa batas)','number']],
 cols:r=>[esc(r.name),fr(r.amount||0),`${fr(r.amount||0)} ÷ ${r.divMode=='fixed'?(+r.divFixed||'?'):DL[r.divMode||'period']}${r.subOff=='1'?' (dikurangi libur)':''} ÷ ${+r.hoursPerDay||1} jam × jam masuk`],
