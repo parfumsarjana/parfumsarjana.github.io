@@ -55,20 +55,26 @@ const hrs=h=>h.inAt&&h.outAt?(new Date(h.outAt)-new Date(h.inAt))/36e5:0;
 const hav=(a,b,c,d)=>{const r=x=>x*Math.PI/180,x=Math.sin(r(c-a)/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(r(d-b)/2)**2;return 12742e3*Math.asin(Math.sqrt(x))};
 const tbl=(h,r)=>`<div class=sc><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${r.map(x=>`<tr>${x.map(c=>`<td>${c??''}</td>`).join('')}</tr>`).join('')}</table></div>`;
 const opts=(a,v)=>a.map(x=>`<option value="${esc(x[0])}"${x[0]==v?' selected':''}>${esc(x[1])}</option>`).join('');
-let me,em,tab='staff',PM,FS='',TS='';const today=()=>nowL().slice(0,10);let DA=today().slice(0,8)+'01',DB=today();
+let me,em,tab='summary',PM,FS='',TS='';const today=()=>nowL().slice(0,10);let DA=today().slice(0,8)+'01',DB=today();
 const av=(p,n,c='av')=>p?`<img class="${c}" src="${p}">`:`<span class="${c}">${esc((n||'?')[0].toUpperCase())}</span>`;
 const chips=(st,sel,all)=>`<div class=chips>${all?`<button class="chip${sel?'':' on'}" data-s="">Semua</button>`:''}${st.map(s=>`<button class="chip${s.email==sel?' on':''}" data-s="${esc(s.email)}">${av(s.photo,s.name)}${esc(s.name)}</button>`).join('')}</div>`;
 const bindChips=(m,f)=>m.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>f(b.dataset.s));
 const rng=(a,b)=>`<div class=two><label>Dari<input type=date id=d1 value="${a}"></label><label>Sampai<input type=date id=d2 value="${b}"></label></div>`;
 const bindRng=(m,f)=>{m.querySelector('#d1').onchange=e=>{DA=e.target.value;f()};m.querySelector('#d2').onchange=e=>{DB=e.target.value;f()}};
-let MO=today().slice(0,7);
+let MO=today().slice(0,7),AA=today(),AB=today();
+const DAYN=[['1','Senin'],['2','Selasa'],['3','Rabu'],['4','Kamis'],['5','Jumat'],['6','Sabtu'],['0','Minggu']],DAYS=DAYN.map(x=>x[0]);
+const dayLbl=d=>!d?.length||d.length==7?'Setiap hari':DAYN.filter(x=>d.includes(x[0])).map(x=>x[1].slice(0,3)).join(', ');
+const PL={hour:'Per jam',day:'Per hari',shift:'Per shift',month:'Per bulan'};
 const summ=(email,att,tk,lg,shs,mo)=>{const [y,m]=mo.split('-').map(Number),S=mo+'-01',last=fmtD(new Date(y,m,0)),E=last<today()?last:today();
 const a=att.filter(x=>x.email==email&&x.date>=S&&x.date<=E&&x.inAt),late=a.filter(x=>{const sh=shs.find(s=>s.id==x.shiftId);return sh&&x.inAt.slice(11)>sh.start}).length;
 const tr=taskRows(tk.filter(t=>t.email==email),lg,S,E);
 return {days:new Set(a.map(x=>x.date)).size,n:a.length,late,jam:a.reduce((n,x)=>n+hrs(x),0),noOut:a.filter(x=>!x.outAt).length,tt:tr.length,td:tr.filter(r=>r.done).length}};
 const tiles=r=>`<div class=sg>${[[r.days,'Hari masuk'],[r.n-r.late,'Tepat waktu'],[r.late,'Tidak tepat waktu'],[r.jam.toFixed(1),'Total jam kerja'],[r.noOut,'Belum absen pulang'],[r.td+' / '+r.tt,'Tugas selesai'],[r.tt-r.td,'Tugas tidak selesai']].map(([v,l])=>`<div><b>${v}</b><small>${l}</small></div>`).join('')}</div>`;
 const csv=(n,h,r)=>{const q=x=>'"'+String(x??'').replace(/"/g,'""')+'"',b=new Blob(['\ufeff'+[h,...r].map(l=>l.map(q).join(',')).join('\n')],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n+'.csv';a.click()};
-const taskRows=(tk,lg,a,b)=>{const o=[];for(let d=new Date(a+'T00:00');fmtD(d)<=b&&o.length<3000;d.setDate(d.getDate()+1)){const ds=fmtD(d);tk.forEach(t=>{if(t.created&&ds<t.created)return;const l=lg.find(x=>x.id==t.id+'_'+ds);o.push({email:t.email,text:t.text,time:t.time,date:ds,done:!!l?.done,doneAt:l?.doneAt||''})})}return o};
+const parseCSV=t=>{t=t.replace(/^\ufeff/,'');const l0=t.split(/\r?\n/)[0],d=l0.split(';').length>l0.split(',').length?';':',',R=[];let r=[],c='',q=0;
+for(let i=0;i<t.length;i++){const ch=t[i];if(q){if(ch=='"'){if(t[i+1]=='"'){c+='"';i++}else q=0}else c+=ch}else if(ch=='"')q=1;else if(ch==d){r.push(c);c=''}else if(ch=='\n'||ch=='\r'){if(ch=='\r'&&t[i+1]=='\n')i++;r.push(c);c='';R.push(r);r=[]}else c+=ch}
+if(c||r.length){r.push(c);R.push(r)}return R.filter(x=>x.some(y=>y.trim()))};
+const taskRows=(tk,lg,a,b)=>{const o=[];for(let d=new Date(a+'T00:00');fmtD(d)<=b&&o.length<3000;d.setDate(d.getDate()+1)){const ds=fmtD(d);tk.forEach(t=>{if(t.created&&ds<t.created)return;if(t.days?.length&&!t.days.includes(String(d.getDay())))return;const l=lg.find(x=>x.id==t.id+'_'+ds);o.push({email:t.email,text:t.text,time:t.time,date:ds,done:!!l?.done,doneAt:l?.doneAt||''})})}return o};
 window.out=()=>signOut(auth);
 const bar=()=>`<div class="card bar"><b>Absensi</b><span>${esc(me?.name)} · ${me?.role||''}</span><button onclick="out()">Keluar</button></div>`;
 
@@ -124,7 +130,7 @@ const open=hist.find(h=>h.inAt&&!h.outAt);
 $('#app').className='';
 const pick=(a,ids)=>a.filter(x=>ids.includes(x.id));
 const L2=pick(locs,me.locIds||(me.locId?[me.locId]:[])),S2=pick(shs,me.shiftIds||(me.shiftId?[me.shiftId]:[]));
-const tdy=today(),tk0=tasks.filter(t=>!t.created||t.created<=tdy).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+const tdy=today(),tk0=tasks.filter(t=>(!t.created||t.created<=tdy)&&(!t.days?.length||t.days.includes(String(new Date().getDay())))).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
 const doneToday=hist.some(h=>h.date==tdy&&h.inAt);
 view(`<div class=top><button class=avb id=pf>${av(me.photo,me.name)}</button><div><b>${esc(me.name)}</b><br><small>${esc(me.position||'Staff')}</small></div></div>
 <div class=hi><h2>Halo 👋 ${esc((me.name||'').split(' ')[0])}</h2><p>Semangat kerja ya!</p></div>
@@ -159,16 +165,16 @@ d.querySelector('#fi').onchange=async e=>{if(!e.target.files[0])return;const x=a
 const dlg=k=>{const LL=k=='out'?locs.filter(l=>l.id==open.locId):L2,SS=k=='out'?shs.filter(s=>s.id==open.shiftId):S2;
 if(!LL.length||!SS.length)return alert('Admin belum menentukan lokasi dan shift untuk Anda');
 const d=document.createElement('dialog');d.className='ab';
-d.innerHTML=`<h3>Absen ${k=='in'?'Masuk':'Keluar'}</h3><video id=v autoplay playsinline muted></video><canvas id=cv hidden></canvas><div class=two><label>Lokasi<select id=lo>${opts(LL.map(l=>[l.id,l.name]))}</select></label><label>Shift<select id=sh>${opts(SS.map(s=>[s.id,`${s.name} (${s.start}-${s.end})`]))}</select></label></div><p id=st></p><div class=row><button id=cx>Batal</button><button class=p id=go>Foto &amp; ${k=='in'?'Masuk':'Keluar'}</button></div>`;
+d.innerHTML=`<h3>Absen ${k=='in'?'Masuk':'Keluar'}</h3><video id=v autoplay playsinline muted></video><canvas id=cv hidden></canvas><div class=two><label>Lokasi<select id=lo>${opts(LL.map(l=>[l.id,l.name+(l.wfa?' (WFA)':'')]))}</select></label><label>Shift<select id=sh>${opts(SS.map(s=>[s.id,`${s.name} (${s.start}-${s.end})`]))}</select></label></div><p id=st></p><div class=row><button id=cx>Batal</button><button class=p id=go>Foto &amp; ${k=='in'?'Masuk':'Keluar'}</button></div>`;
 document.body.append(d);d.showModal();
 navigator.mediaDevices?.getUserMedia({video:{facingMode:'user'}}).then(s=>{d.stream=s;d.querySelector('#v').srcObject=s}).catch(()=>d.querySelector('#st').textContent='Kamera tidak bisa diakses');
 d.onclose=()=>{d.stream?.getTracks().forEach(t=>t.stop());d.remove()};d.querySelector('#cx').onclick=()=>d.close();d.querySelector('#go').onclick=()=>act(k)};
 const act=async k=>{const st=$('#st');st.className='';try{
 if(k=='in'&&hist.some(h=>h.date==today()&&h.inAt))throw Error('Anda sudah absen hari ini');st.textContent='Mengambil lokasi…';
-const p=await new Promise((a,b)=>navigator.geolocation.getCurrentPosition(a,b,{enableHighAccuracy:true,timeout:15000}));
+const l0=locs.find(x=>x.id==$('#lo').value);const p=l0?.wfa?null:await new Promise((a,b)=>navigator.geolocation.getCurrentPosition(a,b,{enableHighAccuracy:true,timeout:15000}));
 const l=locs.find(x=>x.id==$('#lo').value),sh=shs.find(x=>x.id==$('#sh').value);if(!l||!sh)throw Error('Pilih lokasi dan shift');
-const dist=Math.round(hav(p.coords.latitude,p.coords.longitude,l.lat,l.lng));
-if(dist>l.radius)throw Error(`Di luar radius: ${dist} m dari ${l.name} (maks ${l.radius} m)`);
+const dist=l.wfa?0:Math.round(hav(p.coords.latitude,p.coords.longitude,l.lat,l.lng));
+if(!l.wfa&&dist>l.radius)throw Error(`Di luar radius: ${dist} m dari ${l.name} (maks ${l.radius} m)`);
 const v=$('#v'),cv=$('#cv');if(!v.videoWidth)throw Error('Kamera belum siap');
 cv.width=320;cv.height=v.videoHeight/v.videoWidth*320;cv.getContext('2d').drawImage(v,0,0,cv.width,cv.height);
 const photo=cv.toDataURL('image/jpeg',.5),now=nowL();
@@ -178,10 +184,10 @@ document.querySelectorAll('dialog.ab').forEach(x=>x.close());staffUI()}catch(e){
 $('#bi').onclick=()=>dlg('in');$('#bo').onclick=()=>dlg('out')}
 
 /* ADMIN */
-const TL={staff:'Staff',absensi:'Absensi',summary:'Summary',shifts:'Shift',locations:'Lokasi',positions:'Posisi',tasks:'Tugas',taskhist:'Riwayat Tugas',cutoffs:'Cut Off',payroll:'Payroll'};
+const TL={summary:'Summary',staff:'Staff',absensi:'Absensi',shifts:'Shift',locations:'Lokasi',positions:'Posisi',tasks:'Tugas',taskhist:'Riwayat Tugas',cutoffs:'Cut Off',payroll:'Payroll',paycfg:'Pengaturan Gaji'};
 async function adminUI(){$('#app').className='w';
 view(bar()+`<div class=tabs>${Object.entries(TL).map(([k,l])=>`<button data-t=${k} class="${k==tab?'p':''}">${l}</button>`).join('')}</div><div id=main></div>`);
-document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;adminUI()});
+document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{if(b.dataset.t=='absensi'&&tab!='absensi')AA=AB=today();tab=b.dataset.t;adminUI()});
 try{await TABS[tab]($('#main'))}catch(e){$('#main').innerHTML=`<p class=err>${esc(e.message)}</p>`}}
 
 async function manage(m,{c,t,f,rows,cols,head,id,pre,def={}}){
@@ -192,26 +198,44 @@ m.querySelector('#ad').onclick=()=>sv();
 m.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>sv(rows.find(r=>r.id==b.dataset.e)));
 m.querySelectorAll('[data-d]').forEach(b=>b.onclick=async()=>{if(confirm('Hapus data ini?')){await deleteDoc(doc(db,c,b.dataset.d));adminUI()}})}
 
-const PT=[['hour','Per jam'],['day','Per hari'],['shift','Per shift']];
+const PT=[['hour','Per jam'],['day','Per hari'],['shift','Per shift (total gaji bulanan ÷ jumlah hari)'],['month','Per bulan (potong prorata jika tidak masuk)']];
 const TABS={
 async staff(m){const [rows,pos,sh,lo,co]=await Promise.all([list('staff'),list('positions'),list('shifts'),list('locations'),list('cutoffs')]);
 const nm=(a,i)=>esc(a.find(x=>x.id==i)?.name);
 await manage(m,{c:'staff',t:'Staff',head:['Nama lengkap','No HP','Email','NIK','Tempat, tgl lahir','Alamat','Posisi','Lokasi','Shift','Mulai kerja','Role','Gaji','Tipe',''],rows,
-f:[['name','Nama lengkap'],['phone','No HP','tel'],['email','Email','email'],['nik','NIK'],['gender','Jenis kelamin','select',[['','-'],['L','Laki-laki'],['P','Perempuan']]],['birthPlace','Tempat lahir'],['birthDate','Tanggal lahir','date'],['address','Alamat tempat tinggal'],['emergency','Kontak darurat (nama & no HP)'],['startDate','Mulai bekerja','date'],['role','Role','select',[['staff','Staff'],['admin','Admin']]],['position','Posisi','select',[['','-'],...pos.map(p=>[p.name,p.name])]],['locIds','Lokasi kerja (boleh lebih dari satu)','check',lo.map(l=>[l.id,l.name])],['shiftIds','Shift (boleh lebih dari satu)','check',sh.map(s=>[s.id,s.name])],['cutoffId','Cut off','select',[['','- (default tgl 25)'],...co.map(c=>[c.id,c.name])]],['payType','Tipe gaji','select',PT],['rate','Gaji (Rp)','number']],
+f:[['name','Nama lengkap'],['phone','No HP','tel'],['email','Email','email'],['nik','NIK'],['gender','Jenis kelamin','select',[['','-'],['L','Laki-laki'],['P','Perempuan']]],['birthPlace','Tempat lahir'],['birthDate','Tanggal lahir','date'],['address','Alamat tempat tinggal'],['emergency','Kontak darurat (nama & no HP)'],['startDate','Mulai bekerja','date'],['role','Role','select',[['staff','Staff'],['admin','Admin']]],['position','Posisi','select',[['','-'],...pos.map(p=>[p.name,p.name])]],['locIds','Lokasi kerja (boleh lebih dari satu)','check',lo.map(l=>[l.id,l.name])],['shiftIds','Shift (boleh lebih dari satu)','check',sh.map(s=>[s.id,s.name])],['cutoffId','Cut off','select',[['','- (default tgl 25)'],...co.map(c=>[c.id,c.name])]],['payType','Tipe gaji','select',PT],['rate','Gaji (Rp): per jam / per hari / TOTAL per bulan (untuk Per shift & Per bulan)','number']],
 cols:r=>[esc(r.name),esc(r.phone),esc(r.email),esc(r.nik),esc([r.birthPlace,r.birthDate].filter(Boolean).join(', ')),esc(r.address),esc(r.position),(r.locIds||[r.locId]).map(i=>nm(lo,i)).filter(Boolean).join(', '),(r.shiftIds||[r.shiftId]).map(i=>nm(sh,i)).filter(Boolean).join(', '),r.startDate||'',r.role,fr(r.rate||0),(PT.find(x=>x[0]==r.payType)||[])[1]||''],
 id:(o,r)=>r?r.id:o.email.toLowerCase(),pre:(o,r)=>{if(!r)o.email=o.email.toLowerCase()},def:{role:'staff',payType:'hour'}})},
-async absensi(m){const [st,sh,all]=await Promise.all([list('staff'),list('shifts'),list('attendance')]);
-m.innerHTML=chips(st,FS,1)+rng(DA,DB);bindChips(m,v=>{FS=v;adminUI()});bindRng(m,adminUI);
-const rows=all.filter(a=>(!FS||a.email==FS)&&a.date>=DA&&a.date<=DB).sort((a,b)=>(b.inAt||'').localeCompare(a.inAt||''));
+async absensi(m){const [st,sh,all,locs]=await Promise.all([list('staff'),list('shifts'),list('attendance'),list('locations')]);
+const td=today(),yd=fmtD(new Date(Date.now()-864e5));
+m.innerHTML=chips(st,FS,1)+`<div class=row><button id=qt class="${AA==td&&AB==td?'on':''}">Hari ini</button><button id=qy class="${AA==yd&&AB==yd?'on':''}">Kemarin</button></div>`+rng(AA,AB);
+bindChips(m,v=>{FS=v;adminUI()});
+$('#qt').onclick=()=>{AA=AB=td;adminUI()};$('#qy').onclick=()=>{AA=AB=yd;adminUI()};
+m.querySelector('#d1').onchange=e=>{AA=e.target.value;adminUI()};m.querySelector('#d2').onchange=e=>{AB=e.target.value;adminUI()};
+const rows=all.filter(a=>(!FS||a.email==FS)&&a.date>=AA&&a.date<=AB).sort((a,b)=>(b.inAt||'').localeCompare(a.inAt||''));
 const img=s=>s?`<img class=t src="${s}">`:'';
-m.insertAdjacentHTML('beforeend','<button id=ex>Export CSV</button>');$('#ex').onclick=()=>csv('absensi',['Tanggal','Nama','Email','Shift','Lokasi','Masuk','Pulang','Jam','Jarak masuk (m)','Jarak pulang (m)'],rows.map(r=>[r.date,r.name,r.email,r.shiftName,r.locName,r.inAt,r.outAt,hrs(r).toFixed(1),r.inDist,r.outDist]));
+m.insertAdjacentHTML('beforeend','<div class=row><button id=ex>Export CSV</button><button id=im>Import CSV</button><button id=tp>Template CSV</button><input type=file id=imf accept=".csv,text/csv" hidden></div>');
+$('#ex').onclick=()=>csv('absensi',['Tanggal','Nama','Email','Shift','Lokasi','Masuk','Pulang','Jam','Jarak masuk (m)','Jarak pulang (m)'],rows.map(r=>[r.date,r.name,r.email,r.shiftName,r.locName,r.inAt,r.outAt,hrs(r).toFixed(1),r.inDist,r.outDist]));
+$('#tp').onclick=()=>csv('template-import-absensi',['Email','Shift','Lokasi','Masuk','Pulang'],[[st[0]?.email||'staff@email.com',sh[0]?.name||'Shift 1',locs[0]?.name||'',td+' 08:00',td+' 16:00']]);
+$('#im').onclick=()=>$('#imf').click();
+$('#imf').onchange=async e=>{const f=e.target.files[0];if(!f)return;
+const R=parseCSV(await f.text()),H=(R.shift()||[]).map(x=>x.trim().toLowerCase()),ix=n=>H.indexOf(n),cI=ix('email'),cS=ix('shift'),cL=ix('lokasi'),cM=ix('masuk'),cP=ix('pulang');
+if(cI<0||cS<0||cM<0)return alert('Kolom wajib: Email, Shift, Masuk (opsional: Lokasi, Pulang). Pakai Template CSV atau hasil Export.');
+const dt=x=>{x=(x||'').trim().replace(' ','T');return /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(x)?x.slice(0,16):''},ok=[],bad=[];
+R.forEach((r,i)=>{const em=(r[cI]||'').trim().toLowerCase(),s=st.find(x=>x.email==em),h=sh.find(x=>x.name.toLowerCase()==(r[cS]||'').trim().toLowerCase()),inAt=dt(r[cM]),po=cP<0?'':(r[cP]||'').trim(),outAt=dt(po),ln=cL<0?'':(r[cL]||'').trim(),lo=ln?locs.find(x=>x.name.toLowerCase()==ln.toLowerCase()):null;
+const why=!s?'staff tidak ditemukan':!h?'shift tidak ditemukan':ln&&!lo?'lokasi tidak ditemukan':!inAt?'format Masuk harus YYYY-MM-DD HH:mm':po&&!outAt?'format Pulang harus YYYY-MM-DD HH:mm':'';
+if(why)return bad.push('Baris '+(i+2)+': '+why);
+ok.push([`${em}_${inAt.slice(0,10)}_${h.id}`,{email:em,name:s.name,date:inAt.slice(0,10),shiftId:h.id,shiftName:h.name,locId:lo?.id||'',locName:lo?.name||'',inAt,outAt}])});
+if(!ok.length)return alert('Tidak ada baris valid.\n'+bad.slice(0,8).join('\n'));
+if(!confirm(`Impor ${ok.length} absensi?`+(bad.length?`\n\n${bad.length} baris dilewati:\n`+bad.slice(0,8).join('\n'):'')+'\n\nData dengan staff, tanggal, dan shift yang sama akan ditimpa.'))return;
+try{await Promise.all(ok.map(([id,o])=>setDoc(doc(db,'attendance',id),o,{merge:true})));alert('Berhasil impor '+ok.length+' absensi');adminUI()}catch(er){alert(er.message)}};
 await manage(m,{c:'attendance',t:'Absensi',head:['Tanggal','Nama','Shift','Lokasi','Datang','Pulang','Jam','Foto',''],rows,
-f:[['email','Staff','select',st.map(s=>[s.email,s.name])],['shiftId','Shift','select',sh.map(s=>[s.id,s.name])],['inAt','Datang','datetime-local'],['outAt','Pulang','datetime-local']],
+f:[['email','Staff','select',st.map(s=>[s.email,s.name])],['shiftId','Shift','select',sh.map(s=>[s.id,s.name])],['locId','Lokasi','select',[['','-'],...locs.map(l=>[l.id,l.name+(l.wfa?' (WFA)':'')])]],['inAt','Datang','datetime-local'],['outAt','Pulang','datetime-local']],
 cols:r=>[r.date,esc(r.name),esc(r.shiftName),esc(r.locName),(r.inAt||'').slice(11),(r.outAt||'').slice(11),hrs(r).toFixed(1),img(r.inPhoto)+img(r.outPhoto)],
 id:(o,r)=>r?r.id:`${o.email}_${o.inAt.slice(0,10)}_${o.shiftId}`,
-pre:o=>{o.date=o.inAt.slice(0,10);o.name=st.find(s=>s.email==o.email)?.name;o.shiftName=sh.find(s=>s.id==o.shiftId)?.name},def:{inAt:nowL()}})},
+pre:o=>{o.date=o.inAt.slice(0,10);o.name=st.find(s=>s.email==o.email)?.name;o.shiftName=sh.find(s=>s.id==o.shiftId)?.name;o.locName=locs.find(l=>l.id==o.locId)?.name||''},def:{inAt:nowL()}})},
 async shifts(m){const rows=await list('shifts');await manage(m,{c:'shifts',t:'Shift',head:['Nama','Mulai','Selesai',''],rows,f:[['name','Nama shift'],['start','Jam mulai','time'],['end','Jam selesai','time']],cols:r=>[esc(r.name),r.start,r.end]})},
-async locations(m){const rows=await list('locations');await manage(m,{c:'locations',t:'Lokasi',head:['Nama','Titik','Radius (m)',''],rows,f:[['name','Nama lokasi'],['radius','Radius (meter)','number'],['lat','Titik lokasi: klik peta atau cari','map']],cols:r=>[esc(r.name),`<a href="https://www.google.com/maps?q=${r.lat},${r.lng}" target=_blank>Lihat di Google Maps</a>`,r.radius],pre:o=>{if(!o.lat){alert('Pilih titik lokasi di peta dulu');throw 0}},def:{radius:100}})},
+async locations(m){const rows=await list('locations');await manage(m,{c:'locations',t:'Lokasi',head:['Nama','Jenis','Titik','Radius (m)',''],rows,f:[['name','Nama lokasi'],['wfa','Jenis lokasi','select',[['','Onsite (titik peta + radius)'],['1','WFA (tanpa titik peta)']]],['radius','Radius (meter, abaikan jika WFA)','number'],['lat','Titik lokasi: klik peta atau cari (abaikan jika WFA)','map']],cols:r=>[esc(r.name),r.wfa?'WFA':'Onsite',r.wfa?'-':`<a href="https://www.google.com/maps?q=${r.lat},${r.lng}" target=_blank>Lihat di Google Maps</a>`,r.wfa?'-':r.radius],pre:o=>{o.wfa=o.wfa=='1';if(o.wfa){o.lat=null;o.lng=null}else if(!o.lat){alert('Pilih titik lokasi di peta dulu');throw 0}},def:{radius:100,wfa:''}})},
 async positions(m){const rows=await list('positions');await manage(m,{c:'positions',t:'Posisi',head:['Posisi',''],rows,f:[['name','Nama posisi']],cols:r=>[esc(r.name)]})},
 async summary(m){const [st,att,tk,lg,sh]=await Promise.all([list('staff'),list('attendance'),list('tasks'),list('taskLog'),list('shifts')]);
 m.innerHTML=chips(st,FS,1)+`<label>Bulan<input type=month id=mo value="${MO}"></label>`;bindChips(m,v=>{FS=v;adminUI()});$('#mo').onchange=e=>{MO=e.target.value;adminUI()};
@@ -219,10 +243,26 @@ const H=['Nama','Hari masuk','Tepat waktu','Tidak tepat waktu','Total jam','Belu
 const rows=st.filter(s=>!FS||s.email==FS).map(s=>{const r=summ(s.email,att,tk,lg,sh,MO);return [s.name,r.days,r.n-r.late,r.late,r.jam.toFixed(1),r.noOut,r.td,r.tt-r.td]});
 m.insertAdjacentHTML('beforeend','<button id=ex>Export CSV</button>');$('#ex').onclick=()=>csv('summary-'+MO,H,rows);
 m.insertAdjacentHTML('beforeend',`<div class=card>${tbl(H,rows.map(r=>[esc(r[0]),...r.slice(1)]))}</div>`)},
-async tasks(m){const st=await list('staff');FS=FS||st[0]?.email||'';
+async tasks(m){const [st,tpl]=await Promise.all([list('staff'),list('taskTemplates')]);FS=FS||st[0]?.email||'';
 m.innerHTML=chips(st,FS);bindChips(m,v=>{FS=v;adminUI()});
-const rows=(await list('tasks',where('email','==',FS))).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
-await manage(m,{c:'tasks',t:'Tugas',head:['Jam','Tugas',''],rows,f:[['text','Tugas'],['time','Jam bisa dikerjakan (kosong = kapan saja)','time']],cols:r=>[r.time||'-',esc(r.text)],pre:(o,r)=>{o.email=FS;if(!r)o.created=today()}})},
+const rows=(await list('tasks',where('email','==',FS))).sort((a,b)=>(a.time||'').localeCompare(b.time||'')).map(r=>({...r,days:r.days?.length?r.days:DAYS}));
+const MD=[['add','Tambahkan ke tugas yang sudah ada'],['replace','Ganti semua tugas lama']],lbl=t=>(t.time?t.time+' ':'')+t.text+' ('+dayLbl(t.days)+')';
+const give=async(items,to,mode)=>{if(!items.length||!to.length)return;
+if(mode=='replace'){if(!confirm('Semua tugas lama staff tujuan akan dihapus. Lanjut?'))return;const all=await list('tasks');await Promise.all(all.filter(t=>to.includes(t.email)).map(t=>deleteDoc(doc(db,'tasks',t.id))))}
+await Promise.all(to.flatMap(e=>items.map(t=>setDoc(doc(collection(db,'tasks')),{email:e,text:t.text,time:t.time||'',days:t.days||DAYS,created:today()}))));
+alert(items.length+' tugas masuk ke '+to.length+' staff');adminUI()};
+m.insertAdjacentHTML('beforeend','<div class=row><button id=cp>Salin ke staff lain</button><button id=tv>Simpan jadi template</button><button id=tu>Pakai template</button><button id=tx>Hapus template</button></div>');
+$('#cp').onclick=async()=>{if(!rows.length)return alert('Belum ada tugas untuk disalin');
+const o=await form('Salin tugas ke staff lain',[['pick','Tugas yang disalin','check',rows.map(r=>[r.id,lbl(r)])],['to','Staff tujuan','check',st.filter(s=>s.email!=FS).map(s=>[s.email,s.name])],['mode','Cara','select',MD]],{pick:rows.map(r=>r.id)});
+if(o)await give(rows.filter(r=>o.pick.includes(r.id)),o.to,o.mode)};
+$('#tv').onclick=async()=>{if(!rows.length)return alert('Belum ada tugas untuk dijadikan template');const n=prompt('Nama template (mis. Kasir pagi)');if(!n)return;
+await setDoc(doc(collection(db,'taskTemplates')),{name:n,items:rows.map(r=>({text:r.text,time:r.time||'',days:r.days}))});alert('Template "'+n+'" disimpan');adminUI()};
+$('#tu').onclick=async()=>{if(!tpl.length)return alert('Belum ada template. Buat dulu lewat "Simpan jadi template"');
+const o=await form('Pakai template tugas',[['tpl','Template','select',tpl.map(t=>[t.id,`${t.name} (${t.items.length} tugas)`])],['to','Staff tujuan','check',st.map(s=>[s.email,s.name])],['mode','Cara','select',MD]],{to:[FS]});
+if(o)await give(tpl.find(t=>t.id==o.tpl)?.items||[],o.to,o.mode)};
+$('#tx').onclick=async()=>{if(!tpl.length)return alert('Belum ada template');const o=await form('Hapus template',[['tpl','Template','select',tpl.map(t=>[t.id,t.name])]]);
+if(o&&confirm('Hapus template ini?')){await deleteDoc(doc(db,'taskTemplates',o.tpl));adminUI()}};
+await manage(m,{c:'tasks',t:'Tugas',head:['Jam','Tugas','Hari',''],rows,f:[['text','Tugas'],['time','Jam bisa dikerjakan (kosong = kapan saja)','time'],['days','Hari tugas ini muncul','check',DAYN]],cols:r=>[r.time||'-',esc(r.text),dayLbl(r.days)],pre:(o,r)=>{o.email=FS;if(!o.days.length)o.days=DAYS;if(!r)o.created=today()},def:{days:DAYS}})},
 async taskhist(m){const [st,tk,lg]=await Promise.all([list('staff'),list('tasks'),list('taskLog')]);
 m.innerHTML=chips(st,FS,1)+rng(DA,DB)+`<select id=ts><option value="">Semua status</option><option value=1${TS=='1'?' selected':''}>Selesai</option><option value=0${TS=='0'?' selected':''}>Belum selesai</option></select>`;
 bindChips(m,v=>{FS=v;adminUI()});bindRng(m,adminUI);$('#ts').onchange=e=>{TS=e.target.value;adminUI()};
@@ -231,15 +271,37 @@ m.insertAdjacentHTML('beforeend','<button id=ex>Export CSV</button>');$('#ex').o
 m.insertAdjacentHTML('beforeend',`<div class=card>${tbl(['Tanggal','Staff','Tugas','Jam','Status','Selesai pada'],rows.map(r=>[r.date,esc(st.find(s=>s.email==r.email)?.name),esc(r.text),r.time||'-',r.done?'<b class=ok>Selesai</b>':'<span class=err>Belum</span>',r.doneAt]))}</div>`)},
 async cutoffs(m){const rows=await list('cutoffs');await manage(m,{c:'cutoffs',t:'Cut Off',head:['Nama','Tanggal cut off',''],rows,f:[['name','Nama cut off (mis. Bulanan tgl 25)'],['day','Tanggal cut off (1-31)','number']],cols:r=>[esc(r.name),r.day],def:{day:25}})},
 async payroll(m){PM=PM||today().slice(0,7);const [y,mm]=PM.split('-').map(Number);
-const [st,att,adj,cos]=await Promise.all([list('staff'),list('attendance'),list('adjust'),list('cutoffs')]);
-const end=(c,Y,M)=>new Date(Y,M,Math.min(c,new Date(Y,M+1,0).getDate()));
-const rows=st.map(p=>{const c=cos.find(x=>x.id==p.cutoffId),co=c?.day||25,S=fmtD(new Date(end(co,y,mm-2).getTime()+864e5)),E=fmtD(end(co,y,mm-1));
+const [st,att,adj,cos,its,hol,lv,c0]=await Promise.all([list('staff'),list('attendance'),list('adjust'),list('cutoffs'),list('adjItems',where('period','==',PM)),list('holidays'),list('leaves'),getDoc(doc(db,'settings','payroll'))]);
+const cfg={fixedDiv:0,offDays:[],prorata:'1',...(c0.exists()?c0.data():{})};
+const end=(c,Y,M)=>new Date(Y,M,Math.min(c,new Date(Y,M+1,0).getDate())),td=today(),yd=fmtD(new Date(Date.now()-864e5)),isHol=ds=>hol.some(h=>ds>=h.from&&ds<=(h.to||h.from));
+const rows=st.map(p=>{const c=cos.find(x=>x.id==p.cutoffId),co=c?.day||25,S=fmtD(new Date(end(co,y,mm-2).getTime()+864e5)),E=fmtD(end(co,y,mm-1)),t=p.payType||'hour',rt=p.rate||0;
+const nd=Math.round((new Date(E+'T00:00')-new Date(S+'T00:00'))/864e5)+1,div=+cfg.fixedDiv||nd;
 const a=att.filter(x=>x.email==p.email&&x.date>=S&&x.date<=E&&x.outAt),h=a.reduce((n,x)=>n+hrs(x),0),d=new Set(a.map(x=>x.date)).size;
-const base=(p.payType=='day'?d:p.payType=='shift'?a.length:h)*(p.rate||0),aj=adj.find(x=>x.id==PM+'_'+p.email)||{amt:0};
-return {p,S,E,c,h,d,n:a.length,base,aj,tot:base+(aj.amt||0)}});
-m.innerHTML=`<div class=card><label>Bulan payroll<input type=month id=pm value="${PM}"></label>${tbl(['Nama','Cut off','Periode','Jam','Hari','Shift','Gaji dasar','Penyesuaian','Total',''],rows.map(r=>[esc(r.p.name),esc(r.c?.name||'Default tgl 25'),r.S+' s/d '+r.E,r.h.toFixed(1),r.d,r.n,fr(r.base),fr(r.aj.amt||0)+(r.aj.note?' ('+esc(r.aj.note)+')':''),'<b>'+fr(r.tot)+'</b>',`<button data-a="${esc(r.p.email)}">Edit</button>`]))}</div>`;
-$('#pm').onchange=x=>{PM=x.target.value;adminUI()};m.insertAdjacentHTML('afterbegin','<button id=ex>Export CSV</button>');$('#ex').onclick=()=>csv('payroll-'+PM,['Nama','Cut off','Periode','Jam','Hari','Shift','Gaji dasar','Penyesuaian','Catatan','Total'],rows.map(r=>[r.p.name,r.c?.name||'Default tgl 25',r.S+' s/d '+r.E,r.h.toFixed(1),r.d,r.n,Math.round(r.base),r.aj.amt||0,r.aj.note||'',Math.round(r.tot)]));
-m.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const k=PM+'_'+b.dataset.a,o=await form('Penyesuaian payroll',[['amt','Bonus (+) / potongan (-) Rp','number'],['note','Catatan']],adj.find(x=>x.id==k)||{});
-if(o){await setDoc(doc(db,'adjust',k),{...o,period:PM,email:b.dataset.a});adminUI()}})}
+const base=t=='shift'?a.length*rt/div:t=='month'?rt:(t=='day'?d:h)*rt;
+let abs=0,cut=0;
+if(t=='month'){const lim=E<td?E:yd,pres=new Set(att.filter(x=>x.email==p.email&&x.inAt).map(x=>x.date));
+for(let dd=new Date(S+'T00:00');fmtD(dd)<=lim;dd.setDate(dd.getDate()+1)){const ds=fmtD(dd);
+if((p.startDate&&ds<p.startDate)||isHol(ds)||cfg.offDays.includes(String(dd.getDay()))||pres.has(ds)||lv.some(l=>l.email==p.email&&ds>=l.from&&ds<=(l.to||l.from)))continue;abs++}
+if(cfg.prorata=='1')cut=abs*rt/div}
+const aj=adj.find(x=>x.id==PM+'_'+p.email)||{amt:0},mine=its.filter(x=>x.email==p.email),at=(aj.amt||0)+mine.reduce((n,x)=>n+(+x.amt||0),0),notes=[aj.note,...mine.map(x=>x.note)].filter(Boolean).join('; ');
+return {p,t,S,E,c,h,d,n:a.length,div,abs,cut,base,at,notes,rt,tot:base-cut+at}});
+const H=['Nama','Tipe','Cut off','Periode','Jam','Hari','Shift','Tidak masuk','Gaji dasar','Potongan prorata','Penyesuaian','Total',''];
+m.innerHTML=`<div class=card><label>Bulan payroll<input type=month id=pm value="${PM}"></label>${tbl(H,rows.map(r=>[esc(r.p.name),PL[r.t],esc(r.c?.name||'Default tgl 25'),r.S+' s/d '+r.E,r.h.toFixed(1),r.d,r.t=='shift'?`${r.n} × ${fr(r.rt/r.div)}`:r.n,r.t=='month'?r.abs+' hari':'-',fr(r.base),r.cut?'-'+fr(r.cut):'-',fr(r.at)+(r.notes?' ('+esc(r.notes)+')':''),'<b>'+fr(r.tot)+'</b>',`<button data-a="${esc(r.p.email)}">+ Penyesuaian</button>`]))}</div>`;
+$('#pm').onchange=x=>{PM=x.target.value;adminUI()};m.insertAdjacentHTML('afterbegin','<button id=ex>Export CSV</button>');
+$('#ex').onclick=()=>csv('payroll-'+PM,['Nama','Tipe','Cut off','Periode','Jam','Hari','Shift','Hari tidak masuk','Gaji dasar','Potongan prorata','Penyesuaian','Catatan','Total'],rows.map(r=>[r.p.name,PL[r.t],r.c?.name||'Default tgl 25',r.S+' s/d '+r.E,r.h.toFixed(1),r.d,r.n,r.t=='month'?r.abs:'',Math.round(r.base),Math.round(r.cut),Math.round(r.at),r.notes,Math.round(r.tot)]));
+m.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const o=await form('Penyesuaian payroll',[['amt','Bonus (+) / potongan (-) Rp','number'],['note','Catatan']]);
+if(o){await setDoc(doc(collection(db,'adjItems')),{...o,period:PM,email:b.dataset.a});adminUI()}})},
+
+async paycfg(m){PM=PM||today().slice(0,7);const [st,hol,lv,its,c0]=await Promise.all([list('staff'),list('holidays'),list('leaves'),list('adjItems',where('period','==',PM)),getDoc(doc(db,'settings','payroll'))]);
+const cfg={fixedDiv:0,offDays:[],prorata:'1',...(c0.exists()?c0.data():{})},nm=e=>esc(st.find(s=>s.email==e)?.name||e),se=[...st].map(s=>[s.email,s.name]);
+m.innerHTML=`<div class=card><b>Aturan perhitungan</b><div class=kv><small>Pembagi hari gaji</small><div>${+cfg.fixedDiv||'Otomatis (jumlah hari dalam periode, mis. 30)'}</div></div><div class=kv><small>Libur rutin mingguan (tidak dihitung tidak masuk)</small><div>${cfg.offDays.length?dayLbl(cfg.offDays):'Tidak ada'}</div></div><div class=kv><small>Potong prorata gaji per bulan</small><div>${cfg.prorata=='1'?'Ya':'Tidak'}</div></div><p><small>Per shift: total gaji bulanan ÷ pembagi × jumlah shift masuk. Per bulan: dipotong (gaji ÷ pembagi) tiap hari tidak masuk, kecuali sakit, tanggal merah/libur nasional, dan libur rutin.</small></p><button id=cf class=p>Ubah aturan</button></div><div id=h1></div><div id=h2></div><div id=h3></div>`;
+$('#cf').onclick=async()=>{const o=await form('Aturan gaji',[['fixedDiv','Pembagi hari (0 = otomatis sesuai jumlah hari periode, mis. 30)','number'],['prorata','Gaji per bulan: potong prorata jika tidak masuk','select',[['1','Ya'],['0','Tidak']]],['offDays','Libur rutin mingguan (tidak dihitung tidak masuk)','check',DAYN]],cfg);if(o){await setDoc(doc(db,'settings','payroll'),o);adminUI()}};
+const need=o=>{if(!o.from){alert('Tanggal wajib diisi');throw 0}if(!o.to)o.to=o.from};
+$('#h1').innerHTML='<h3>Tanggal merah / libur nasional</h3>';
+await manage($('#h1'),{c:'holidays',t:'Libur',head:['Tanggal','Keterangan',''],rows:hol.sort((a,b)=>b.from.localeCompare(a.from)),f:[['from','Dari tanggal','date'],['to','Sampai tanggal (kosong = 1 hari)','date'],['name','Keterangan (mis. Idul Fitri)']],cols:r=>[r.from+(r.to&&r.to!=r.from?' s/d '+r.to:''),esc(r.name)],pre:need});
+$('#h2').innerHTML='<h3>Sakit (tidak dipotong)</h3>';
+await manage($('#h2'),{c:'leaves',t:'Sakit',head:['Staff','Tanggal','Catatan',''],rows:lv.sort((a,b)=>b.from.localeCompare(a.from)),f:[['email','Staff','select',se],['from','Dari tanggal','date'],['to','Sampai tanggal (kosong = 1 hari)','date'],['note','Catatan']],cols:r=>[nm(r.email),r.from+(r.to&&r.to!=r.from?' s/d '+r.to:''),esc(r.note)],pre:need});
+$('#h3').innerHTML=`<h3>Penyesuaian gaji</h3><label>Bulan payroll<input type=month id=pm2 value="${PM}"></label>`;$('#pm2').onchange=x=>{PM=x.target.value;adminUI()};
+await manage($('#h3'),{c:'adjItems',t:'Penyesuaian',head:['Staff','Catatan','Jumlah',''],rows:its,f:[['email','Staff','select',se],['amt','Bonus (+) / potongan (-) Rp','number'],['note','Catatan']],cols:r=>[nm(r.email),esc(r.note),fr(r.amt||0)],pre:(o,r)=>{if(!r)o.period=PM}})}
 };
 </script></body></html>
