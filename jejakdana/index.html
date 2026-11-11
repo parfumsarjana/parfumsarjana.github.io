@@ -68,20 +68,23 @@ let S=JSON.parse(localStorage.getItem("mm")||"null")||{
  tx:[],members:[]};
 let LID=null,tab="home",F={p:"month",c:"all",a:today(),z:today()},M=null,fb=null,user=null,dip=null;
 async function save(){localStorage.setItem("mm",JSON.stringify(S));
- if(fb&&user)try{await fb.setDoc(fb.doc(fb.db,"ledgers",LID||user.uid),S)}catch(e){alert("Gagal sync: "+e.message)}}
+ if(fb&&user&&user.emailVerified)try{await fb.setDoc(fb.doc(fb.db,"ledgers",LID||user.uid),S)}catch(e){alert("Gagal sync: "+e.message)}}
 // ---------- Firebase ----------
 async function initFB(){if(!FB.apiKey)return;
  const v="10.14.1",b=`https://www.gstatic.com/firebasejs/${v}/`;
  const [A,Au,Fs]=await Promise.all([import(b+"firebase-app.js"),import(b+"firebase-auth.js"),import(b+"firebase-firestore.js")]);
  const app=A.initializeApp(FB),auth=Au.getAuth(app);fb={...Au,...Fs,auth,db:Fs.getFirestore(app)};
- if(fb.isSignInWithEmailLink(auth,location.href)){let e=localStorage.getItem("mmEmail")||prompt("Konfirmasi email Anda");
-  await fb.signInWithEmailLink(auth,e,location.href);history.replaceState(null,"",location.pathname)}
- fb.onAuthStateChanged(auth,async u=>{user=u;LID=null;if(u){const q=await fb.getDocs(fb.query(fb.collection(fb.db,"ledgers"),fb.where("members","array-contains",(u.email||"").toLowerCase())));
-  if(!q.empty){LID=q.docs[0].id;S=q.docs[0].data()}else{LID=u.uid;const d=await fb.getDoc(fb.doc(fb.db,"ledgers",LID));if(d.exists())S=d.data();else await save()}}
- r()});}
-async function sendLink(){const e=$("#em").value.trim();if(!e)return;
- await fb.sendSignInLinkToEmail(fb.auth,e,{url:location.href.split("#")[0],handleCodeInApp:true});
- localStorage.setItem("mmEmail",e);alert("Link masuk dikirim ke "+e)}
+ fb.onAuthStateChanged(auth,async u=>{user=u;LID=null;if(u&&u.emailVerified)await loadLedger(u);r()})}
+async function loadLedger(u){LID=null;try{const q=await fb.getDocs(fb.query(fb.collection(fb.db,"ledgers"),fb.where("members","array-contains",(u.email||"").toLowerCase())));
+ if(!q.empty){LID=q.docs[0].id;S=q.docs[0].data()}else{LID=u.uid;const d=await fb.getDoc(fb.doc(fb.db,"ledgers",LID));if(d.exists())S=d.data();else await save()}}
+ catch(e){alert("Gagal memuat data: "+e.message)}}
+const aerr=e=>({"auth/invalid-credential":"Email atau password salah","auth/wrong-password":"Email atau password salah","auth/user-not-found":"Email atau password salah","auth/email-already-in-use":"Email sudah terdaftar, silakan masuk","auth/weak-password":"Password minimal 6 karakter","auth/invalid-email":"Format email tidak valid","auth/too-many-requests":"Terlalu banyak percobaan, coba lagi nanti","auth/network-request-failed":"Koneksi internet bermasalah"}[e.code]||e.message);
+const cred=()=>[$("#em").value.trim(),$("#pw").value];
+window.login=async()=>{const[e,p]=cred();if(!e||!p)return note("Isi email dan password");try{await fb.signInWithEmailAndPassword(fb.auth,e,p)}catch(x){note(aerr(x))}};
+window.register=async()=>{const[e,p]=cred();if(!e||!p)return note("Isi email dan password");try{const c=await fb.createUserWithEmailAndPassword(fb.auth,e,p);await fb.sendEmailVerification(c.user);note("Akun dibuat. Link verifikasi dikirim ke "+e+". Buka link itu (cek folder Spam), lalu kembali ke sini.")}catch(x){note(aerr(x))}};
+window.resetPw=async()=>{const e=$("#em").value.trim();if(!e)return note("Isi email dulu");try{await fb.sendPasswordResetEmail(fb.auth,e);note("Link reset password dikirim ke "+e)}catch(x){note(aerr(x))}};
+window.resend=async()=>{try{await fb.sendEmailVerification(user);note("Link verifikasi dikirim ulang ke "+user.email)}catch(x){note(aerr(x))}};
+window.verified=async()=>{try{await user.reload();if(!user.emailVerified)return note("Email belum terverifikasi. Buka link di email, cek folder Spam.");await user.getIdToken(true);await loadLedger(user);r()}catch(x){note(aerr(x))}};
 // ---------- helpers ----------
 const sn=id=>(S.st.find(x=>x.id==id)||{}).name||"-";
 const cn=t=>{let c=[...S.exp,...S.inc].find(x=>x.id==t.cat);return c?c.name+(t.sub?" › "+t.sub:""):t.type=="tf"?"Transfer":"-"};
@@ -143,8 +146,10 @@ penyimpanan(){return S.st.map(s=>`<div class="card row"><div><b>${s.name}</b><di
  `<div class="card row"><b>Total</b><b>${rp(S.st.reduce((a,s)=>a+bal(s.id),0))}</b></div><button class="b" onclick="add('st')">+ Dompet</button>`},
 tagihan(){return S.bills.map(b=>`<div class="card row"><div><b>${b.name}</b><div class="mu">${rp(b.amt)} · tiap tgl ${b.day}</div></div><div>
  <button class="b sm" onclick="payBill('${b.id}')">Bayar</button> ${ib("bills",b.id)}</div></div>`).join("")+`<button class="b" onclick="add('bills')">+ Tagihan</button>`},
-profil(){return`<div class="card">${FB.apiKey?(user?`<b>${user.email}</b><button class="b s" onclick="fb.signOut(fb.auth)">Keluar</button>`:
- `<b>Masuk</b><input id="em" type="email" placeholder="email"><button class="b" onclick="sendLink()">Kirim link masuk</button>`):`<b>Mode lokal</b><div class="mu">Isi konfigurasi Firebase di bagian atas file agar data tersimpan di cloud.</div>`}</div>
+profil(){const kv=`<b>Masuk / Daftar</b><input id="em" type="email" autocomplete="email" placeholder="email"><input id="pw" type="password" autocomplete="current-password" placeholder="password (min. 6 karakter)" onkeydown="if(event.key=='Enter')login()"><button class="b" onclick="login()">Masuk</button><button class="b s" onclick="register()">Daftar akun baru</button><button class="b s" onclick="resetPw()">Lupa password</button>`,
+ vf=`<b>Verifikasi email</b><div class="mu">Kami mengirim link verifikasi ke ${user?.email}. Buka link itu, lalu tekan tombol di bawah.</div><button class="b" onclick="verified()">Saya sudah verifikasi</button><button class="b s" onclick="resend()">Kirim ulang link</button><button class="b s" onclick="fb.signOut(fb.auth)">Keluar</button>`,
+ ok=`<b>${user?.email}</b><button class="b s" onclick="fb.signOut(fb.auth)">Keluar</button>`;
+ return`<div class="card">${FB.apiKey?(!user?kv:!user.emailVerified?vf:ok):`<b>Mode lokal</b><div class="mu">Isi konfigurasi Firebase di bagian atas file agar data tersimpan di cloud.</div>`}</div>
  <h3>Pengaturan</h3><button class="card row lnk" onclick="go('kategori')"><span>Kelola kategori</span>${IC.chev}</button>
  <div class="mu" style="margin:12px 2px 2px">Tampilan</div><div class="tg">${[["light","Terang"],["dark","Gelap"],["auto","Otomatis"]].map(x=>`<button class="b ${getT()==x[0]?"on":""}" onclick="setTheme('${x[0]}')">${x[1]}</button>`).join("")}</div>
  <h3>Member</h3>${S.members.map((m,i)=>`<div class="card row">${m}<button class="i d" onclick="S.members.splice(${i},1);save();r()">🗑</button></div>`).join("")}
@@ -152,7 +157,7 @@ profil(){return`<div class="card">${FB.apiKey?(user?`<b>${user.email}</b><button
  <h3>Instal aplikasi</h3><div class="card"><button class="b" onclick="inst()">Instal di perangkat ini</button>
  <div class="mu">iPhone: Safari → Bagikan → Tambah ke Layar Utama. Android: tombol di atas atau menu Chrome → Instal aplikasi.</div></div>`}};
 window.addMember=()=>dlg("Tambah member",[{l:"Email member",v:"",t:"email"}],async v=>{const e=v[0].trim().toLowerCase();if(!e)return;S.members.push(e);save();
- if(fb)try{await fb.sendPasswordResetEmail(fb.auth,e)}catch(x){}r()});
+ r();note("Member ditambahkan. Minta "+e+" mendaftar dengan email ini di aplikasi, lalu verifikasi emailnya.")});
 window.inst=async()=>{if(dip){dip.prompt();dip=null}else alert("Gunakan menu browser → Tambah ke Layar Utama / Instal aplikasi.")};
 addEventListener("beforeinstallprompt",e=>{e.preventDefault();dip=e});
 window.payBill=id=>{const b=S.bills.find(x=>x.id==id),c=S.exp.find(x=>x.name=="Tagihan");
@@ -214,12 +219,12 @@ window.setTheme=v=>{try{localStorage.setItem("mmTheme",v)}catch(e){}applyTheme()
 const tabs=[["home",IC.home,"Home"],["transaksi",IC.tx,"Transaksi"],["penyimpanan",IC.wallet,"Dompet"],["tagihan",IC.cal,"Tagihan"]];
 const TT={transaksi:"Transaksi",penyimpanan:"Dompet",tagihan:"Tagihan",profil:"Profil",kategori:"Kategori"};
 window.go=t=>{tab=t;r();scrollTo(0,0)};
-window.r=()=>{const lock=FB.apiKey&&!user&&tab!="profil",pg=lock?"profil":tab;
+window.r=()=>{const lock=FB.apiKey&&(!user||!user.emailVerified)&&tab!="profil",pg=lock?"profil":tab;
  $("#mn").innerHTML=(TT[pg]?`<h2 class="pt">${TT[pg]}</h2>`:"")+T[pg]();
  $("#nv").innerHTML=tabs.map(t=>`<button class="${tab==t[0]?"on":""}" onclick="go('${t[0]}')"><span>${t[1]}</span>${t[2]}</button>`).join("");
  const bk=pg=="home"?`<button class="ib2" onclick="go('profil')">${IC.user}</button>`:pg=="profil"?`<button class="ib2" onclick="go('home')">${IC.back}</button>`:pg=="kategori"?`<button class="ib2" onclick="go('profil')">${IC.back}</button>`:"";
  $("#hd").innerHTML=`<div>${bk}</div><div class="ht">Finance Calculator</div><div></div>`};
-Object.assign(window,{F,FT,fdef,sendLink,S:new Proxy({},{get:(_,k)=>S[k]}),$});
+Object.assign(window,{F,FT,fdef,S:new Proxy({},{get:(_,k)=>S[k]}),$});
 Object.defineProperty(window,"tab",{get:()=>tab,set:v=>tab=v});
 Object.defineProperty(window,"fb",{get:()=>fb});
 addEventListener("keydown",e=>{if(!M||document.querySelector(".dl"))return;if(e.key=="Escape")closeM();else if(e.key=="Enter"&&e.target.tagName=="INPUT"&&e.target.type!="file")saveTx()});
