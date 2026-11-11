@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f766e"><title>Money Management</title>
+<style>
+:root{--bg:#f3f6fc;--cd:#fff;--tx:#0b1b3a;--mu:#6b7a99;--pr:#1d4ed8;--pr2:#3b82f6;--soft:#eaf1ff;--in:#059669;--ou:#dc2626;--bd:#e2e9f5;--sh:0 6px 20px rgba(29,78,216,.08)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0a1020;--cd:#121a2e;--tx:#e8eefc;--mu:#93a1c4;--soft:#1a2644;--bd:#232f4d;--in:#34d399;--ou:#f87171;--sh:0 6px 20px rgba(0,0,0,.3)}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#0a1020;--cd:#121a2e;--tx:#e8eefc;--mu:#93a1c4;--soft:#1a2644;--bd:#232f4d;--in:#34d399;--ou:#f87171;--sh:0 6px 20px rgba(0,0,0,.3)}
+:root[data-theme="light"]{color-scheme:light}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font:15px/1.4 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--tx);padding-bottom:100px}
+header{position:sticky;top:0;z-index:5;padding:calc(14px + env(safe-area-inset-top,0px)) 20px 10px;font-size:22px;font-weight:700;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px)}
+main{padding:4px 16px 16px;max-width:560px;margin:auto}
+.hero{background:linear-gradient(135deg,#1e40af,#3b82f6);color:#fff;border-radius:22px;padding:20px;margin:4px 0 14px;box-shadow:0 12px 26px rgba(29,78,216,.28)}
+.hl{font-size:13px;opacity:.85}.hb{font-size:30px;font-weight:700;letter-spacing:-.5px;margin-top:2px}
+.hr{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.chip{background:rgba(255,255,255,.16);border-radius:14px;padding:10px 12px}.chip span{display:block;font-size:12px;opacity:.85}.chip b{font-size:15px}
+.card{background:var(--cd);border:1px solid var(--bd);border-radius:16px;padding:14px;margin-bottom:10px;box-shadow:var(--sh)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.tx{display:flex;align-items:center;gap:12px}.fl{flex:1;min-width:0}.fl b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rt{text-align:right}.ac{display:inline-flex;gap:6px;margin-top:4px}
+.ic{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-size:18px;font-weight:700;flex:none}
+.ic.in{background:rgba(5,150,105,.14);color:var(--in)}.ic.out{background:rgba(220,38,38,.12);color:var(--ou)}.ic.tf{background:var(--soft);color:var(--pr2)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.in{color:var(--in)}.ou{color:var(--ou)}.mu{color:var(--mu);font-size:13px}
+h3{margin:20px 2px 8px;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mu)}
+input,select{width:100%;height:46px;padding:0 14px;border:1px solid var(--bd);border-radius:12px;background:var(--cd);color:var(--tx);font:inherit;margin:4px 0;outline:none}
+input:focus,select:focus{border-color:var(--pr2);box-shadow:0 0 0 3px rgba(59,130,246,.2)}
+button.b{width:100%;height:46px;border:0;border-radius:12px;background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;font:600 15px inherit;margin:6px 0;cursor:pointer;box-shadow:0 4px 12px rgba(29,78,216,.22)}
+button.b.s{background:var(--soft);color:var(--pr2);box-shadow:none}
+button.b.sm{width:auto;height:34px;padding:0 14px;font-size:13px;margin:0}
+button.i{width:32px;height:32px;border:0;border-radius:50%;background:var(--soft);color:var(--pr2);font-size:14px;cursor:pointer;padding:0}
+button.i.d{background:rgba(220,38,38,.1);color:var(--ou)}
+.fab{position:fixed;right:18px;bottom:calc(92px + env(safe-area-inset-bottom,0px));width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;border:0;font-size:32px;line-height:1;box-shadow:0 10px 22px rgba(29,78,216,.4);z-index:6}
+nav{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));max-width:536px;margin:auto;background:var(--cd);border:1px solid var(--bd);border-radius:22px;box-shadow:0 8px 28px rgba(11,27,58,.14);display:flex;padding:6px;z-index:7}
+nav button{flex:1;border:0;background:none;color:var(--mu);padding:7px 0;font-size:10.5px;border-radius:16px}
+nav button.on{background:var(--soft);color:var(--pr2);font-weight:700}nav span{display:block;font-size:18px}
+.ov{position:fixed;inset:0;background:rgba(8,16,40,.5);backdrop-filter:blur(3px);z-index:10;display:flex;align-items:flex-end;justify-content:center}
+.md{background:var(--cd);width:100%;max-width:520px;border-radius:26px 26px 0 0;padding:10px 18px calc(22px + env(safe-area-inset-bottom,0px));max-height:92vh;overflow:auto}
+.md::before{content:"";display:block;width:40px;height:4px;border-radius:4px;background:var(--bd);margin:0 auto 12px}
+.tg{display:flex;gap:4px;background:var(--soft);padding:4px;border-radius:14px;margin:10px 0}
+.tg button.b{background:transparent;color:var(--mu);box-shadow:none;margin:0;height:38px}
+.tg button.b.on{background:var(--cd);color:var(--pr);box-shadow:0 2px 8px rgba(29,78,216,.15)}
+header{display:grid;grid-template-columns:48px 1fr 48px;align-items:center;font-size:17px;text-align:center;padding-left:12px;padding-right:12px;padding-bottom:8px}
+.ht{font-weight:700;letter-spacing:-.2px}.pt{font-size:20px;margin:6px 2px 12px}
+.ib2{width:40px;height:40px;border-radius:50%;border:1px solid var(--bd);background:var(--cd);color:var(--pr2);display:grid;place-items:center;padding:0;cursor:pointer}
+button.i{display:grid;place-items:center}button.i svg{width:15px;height:15px}nav svg{display:block;margin:0 auto 3px}
+.lnk{width:100%;color:var(--tx);font:inherit;text-align:left;cursor:pointer;color:var(--tx)}.lnk svg{width:18px;height:18px;color:var(--mu)}
+input[type=search]{-webkit-appearance:none;appearance:none}.by{display:inline-block;background:var(--soft);color:var(--pr2);border-radius:8px;padding:1px 8px;font-size:11.5px;margin-top:3px}
+.dl{z-index:20}
+</style></head><body>
+<header id="hd">Money Management</header><main id="mn"></main>
+<div id="md"></div><nav id="nv"></nav>
+<script type="module">
+// ===== KONFIGURASI FIREBASE (isi dari Firebase Console > Project settings > Web app) =====
+// Kosongkan apiKey = mode lokal (data di browser saja, untuk tes).
+const FB={apiKey:"AIzaSyBAm39A0CckhbQXTlUatSopQRNQfq_Jdpo",authDomain:"jejakdana-7d8f2.firebaseapp.com",projectId:"jejakdana-7d8f2",appId:"1:365616982047:web:fa8c1f0e84801883668d2a"};
+// =========================================================================================
+const $=s=>document.querySelector(s),uid=()=>Math.random().toString(36).slice(2,9);
+const rp=n=>"Rp"+Math.round(n||0).toLocaleString("id-ID");
+const today=()=>new Date().toISOString().slice(0,10);
+const mk=a=>a.map(n=>({id:uid(),name:n}));
+let S=JSON.parse(localStorage.getItem("mm")||"null")||{
+ st:mk(["Dompet Sam","Dompet Syidda","BCA Sam","BCA Syidda","Dompet Rumah"]).map(x=>({...x,init:0})),
+ exp:mk(["Bisnis","Jajan","Bulanan","Makan","Tagihan"]).map(x=>({...x,subs:[]})),
+ inc:mk(["UMS","UNS","Shopee Lolaloli","Shopee 12Lab","Shopee Parfum Sarjana"]),
+ bills:mk(["Kur","Mobil","Wifi UMS","Wifi UNS","Wifi Rumah","Kios UMS","Kios UNS","Kontrakan"]).map(x=>({...x,amt:0,day:1})),
+ tx:[],members:[]};
+let LID=null,tab="home",F={p:"month",c:"all",a:today(),z:today()},M=null,fb=null,user=null,dip=null;
+async function save(){localStorage.setItem("mm",JSON.stringify(S));
+ if(fb&&user)try{await fb.setDoc(fb.doc(fb.db,"ledgers",LID||user.uid),S)}catch(e){alert("Gagal sync: "+e.message)}}
+// ---------- Firebase ----------
+async function initFB(){if(!FB.apiKey)return;
+ const v="10.14.1",b=`https://www.gstatic.com/firebasejs/${v}/`;
+ const [A,Au,Fs]=await Promise.all([import(b+"firebase-app.js"),import(b+"firebase-auth.js"),import(b+"firebase-firestore.js")]);
+ const app=A.initializeApp(FB),auth=Au.getAuth(app);fb={...Au,...Fs,auth,db:Fs.getFirestore(app)};
+ if(fb.isSignInWithEmailLink(auth,location.href)){let e=localStorage.getItem("mmEmail")||prompt("Konfirmasi email Anda");
+  await fb.signInWithEmailLink(auth,e,location.href);history.replaceState(null,"",location.pathname)}
+ fb.onAuthStateChanged(auth,async u=>{user=u;LID=null;if(u){const q=await fb.getDocs(fb.query(fb.collection(fb.db,"ledgers"),fb.where("members","array-contains",(u.email||"").toLowerCase())));
+  if(!q.empty){LID=q.docs[0].id;S=q.docs[0].data()}else{LID=u.uid;const d=await fb.getDoc(fb.doc(fb.db,"ledgers",LID));if(d.exists())S=d.data();else await save()}}
+ r()});}
+async function sendLink(){const e=$("#em").value.trim();if(!e)return;
+ await fb.sendSignInLinkToEmail(fb.auth,e,{url:location.href.split("#")[0],handleCodeInApp:true});
+ localStorage.setItem("mmEmail",e);alert("Link masuk dikirim ke "+e)}
+// ---------- helpers ----------
+const sn=id=>(S.st.find(x=>x.id==id)||{}).name||"-";
+const cn=t=>{let c=[...S.exp,...S.inc].find(x=>x.id==t.cat);return c?c.name+(t.sub?" › "+t.sub:""):t.type=="tf"?"Transfer":"-"};
+function bal(id){let s=S.st.find(x=>x.id==id).init||0;S.tx.forEach(t=>{if(t.type=="in"&&t.st==id)s+=t.amt;if(t.type=="out"&&t.st==id)s-=t.amt;
+ if(t.type=="tf"){if(t.st==id)s-=t.amt;if(t.to==id)s+=t.amt}});return s}
+function range(){const d=new Date(),y=n=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n).toISOString().slice(0,10);
+ if(F.p=="today")return[y(0),y(0)];if(F.p=="yday")return[y(-1),y(-1)];
+ if(F.p=="range")return[F.a,F.z];const m=today().slice(0,7);return[m+"-01",m+"-31"]}
+function list(){const[a,z]=range();return S.tx.filter(t=>t.date>=a&&t.date<=z&&(F.c=="all"||t.cat==F.c)).sort((x,y)=>y.date.localeCompare(x.date))}
+const txRow=t=>`<div class="card tx"><div class="ic ${t.type}">${t.type=="in"?"↓":t.type=="out"?"↑":"⇄"}</div><div class="fl"><b>${t.note||cn(t)}</b><div class="mu">${t.date} · ${cn(t)} · ${t.type=="tf"?sn(t.st)+" → "+sn(t.to):sn(t.st)}</div><span class="by">oleh ${t.by||"-"}</span></div>
+<div class="rt"><b class="${t.type=="in"?"in":t.type=="out"?"ou":""}">${t.type=="out"?"-":t.type=="in"?"+":""}${rp(t.amt)}</b><br><span class="ac"><button class="i" onclick="editTx('${t.id}')">${IC.edit}</button><button class="i d" onclick="delTx('${t.id}')">${IC.del}</button></span></div></div>`;
+const fdef=()=>({q:"",type:"all",p:"all",a:today(),z:today(),c:"all",w:"all",by:"all"});let FT=fdef();
+const who=()=>user?(user.displayName||user.email):"Saya";
+function listT(){const d=new Date(),yy=n=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n).toISOString().slice(0,10);let a="0000",z="9999";
+ if(FT.p=="today")a=z=yy(0);else if(FT.p=="yday")a=z=yy(-1);else if(FT.p=="week"){a=yy(-6);z=yy(0)}else if(FT.p=="month"){a=today().slice(0,7)+"-01";z=today().slice(0,7)+"-31"}else if(FT.p=="range"){a=FT.a;z=FT.z}
+ const q=FT.q.toLowerCase();return S.tx.filter(t=>t.date>=a&&t.date<=z&&(FT.type=="all"||t.type==FT.type)&&(FT.c=="all"||t.cat==FT.c)&&(FT.w=="all"||t.st==FT.w||t.to==FT.w)&&(FT.by=="all"||(t.by||"-")==FT.by)&&(!q||((t.note||"")+" "+cn(t)).toLowerCase().includes(q))).sort((x,y)=>y.date.localeCompare(x.date))}
+// ---------- Dialog (Enter = OK, Esc = Batal) & CRUD ----------
+function dlg(title,fields,cb,okText="OK"){const el=document.createElement("div");el.className="ov dl";
+ el.innerHTML=`<div class="md"><b>${title}</b>${fields.map((f,i)=>f.t=="msg"?`<p class="mu">${f.v}</p>`:`<div class="mu" style="margin-top:8px">${f.l}</div><input data-i="${i}" type="${f.t||"text"}" value="${String(f.v??"").replace(/"/g,"&quot;")}">`).join("")}<div class="g2" style="margin-top:12px"><button class="b s" data-x>Batal</button><button class="b" data-ok>${okText}</button></div></div>`;
+ document.body.append(el);const ins=[...el.querySelectorAll("input")];
+ const done=ok=>{el.remove();document.removeEventListener("keydown",kd,true);if(ok)cb(ins.map(i=>i.type=="number"?+i.value:i.value))};
+ const kd=e=>{if(e.key=="Enter"){e.preventDefault();e.stopPropagation();done(true)}else if(e.key=="Escape"){e.preventDefault();e.stopPropagation();done(false)}};
+ document.addEventListener("keydown",kd,true);el.querySelector("[data-ok]").onclick=()=>done(true);el.querySelector("[data-x]").onclick=()=>done(false);
+ const f=ins[0]||el.querySelector("[data-ok]");f.focus();f.select&&f.select()}
+const note=t=>dlg("Perhatian",[{t:"msg",v:t}],()=>{});
+const fld=(k,o)=>k=="st"?[{l:"Nama dompet",v:o.name},{l:"Saldo awal (angka)",v:o.init??0,t:"number"}]:k=="bills"?[{l:"Nama tagihan",v:o.name},{l:"Nominal (angka)",v:o.amt??0,t:"number"},{l:"Tgl jatuh tempo (1-31)",v:o.day??1,t:"number"}]:[{l:"Nama",v:o.name}];
+window.add=(k,sub)=>{if(k=="subs")return dlg("Tambah sub kategori",[{l:"Nama",v:""}],v=>{if(v[0].trim()){S.exp.find(x=>x.id==sub).subs.push(v[0].trim());save();r()}});
+ dlg("Tambah",fld(k,{name:""}),v=>{if(!v[0].trim())return;const o={id:uid(),name:v[0].trim()};if(k=="exp")o.subs=[];if(k=="st")o.init=v[1]||0;if(k=="bills"){o.amt=v[1]||0;o.day=v[2]||1}S[k].push(o);save();r()})};
+window.edit=(k,id,i)=>{if(k=="subs"){const c=S.exp.find(x=>x.id==id);return dlg("Edit sub kategori",[{l:"Nama",v:c.subs[i]}],v=>{if(v[0].trim()){c.subs[i]=v[0].trim();save();r()}})}
+ const o=S[k].find(x=>x.id==id);dlg("Edit",fld(k,o),v=>{if(!v[0].trim())return;o.name=v[0].trim();if(k=="st")o.init=v[1]||0;if(k=="bills"){o.amt=v[1]||0;o.day=v[2]||1}save();r()})};
+window.del=(k,id,i)=>dlg("Hapus data?",[{t:"msg",v:"Data ini akan dihapus."}],()=>{if(k=="subs")S.exp.find(x=>x.id==id).subs.splice(i,1);else S[k]=S[k].filter(x=>x.id!=id);save();r()},"Hapus");
+const sv=p=>`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const IC={home:sv('<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>'),tx:sv('<path d="M7 4v14"/><path d="M3 14l4 4 4-4"/><path d="M17 20V6"/><path d="M13 10l4-4 4 4"/>'),wallet:sv('<path d="M3 7h16a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/><path d="M3 7l12-3v3"/><circle cx="17" cy="13.5" r="1"/>'),cal:sv('<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/>'),user:sv('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>'),back:sv('<path d="M15 5l-7 7 7 7"/>'),chev:sv('<path d="M9 5l7 7-7 7"/>'),edit:sv('<path d="M4 20h4L19 9l-4-4L4 16v4z"/>'),del:sv('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>')};
+const ib=(k,id,i="")=>`<span class="ac"><button class="i" onclick="edit('${k}','${id}',${i||0})">${IC.edit}</button><button class="i d" onclick="del('${k}','${id}',${i||0})">${IC.del}</button></span>`;
+// ---------- Tabs ----------
+const T={
+home(){const l=list(),i=l.filter(t=>t.type=="in").reduce((a,t)=>a+t.amt,0),o=l.filter(t=>t.type=="out").reduce((a,t)=>a+t.amt,0);
+ return`<div class="hero"><div class="hl">Total saldo</div><div class="hb">${rp(S.st.reduce((a,x)=>a+bal(x.id),0))}</div><div class="hr"><div class="chip"><span>↓ Masuk</span><b>${rp(i)}</b></div><div class="chip"><span>↑ Keluar</span><b>${rp(o)}</b></div></div></div><div class="g2"><select onchange="F.p=this.value;r()">${[["month","Bulan ini"],["today","Hari ini"],["yday","Kemarin"],["range","Rentang tanggal"]].map(x=>`<option value="${x[0]}" ${F.p==x[0]?"selected":""}>${x[1]}</option>`).join("")}</select>
+ <select onchange="F.c=this.value;r()"><option value="all">Semua kategori</option>${[...S.exp,...S.inc].map(c=>`<option value="${c.id}" ${F.c==c.id?"selected":""}>${c.name}</option>`).join("")}</select></div>
+ ${F.p=="range"?`<div class="g2"><input type="date" value="${F.a}" onchange="F.a=this.value;r()"><input type="date" value="${F.z}" onchange="F.z=this.value;r()"></div>`:""}
+ 
+ <h3>Transaksi</h3>${l.slice(0,30).map(txRow).join("")||'<p class="mu">Belum ada transaksi.</p>'}<button class="fab" onclick="openTx()">+</button>`},
+transaksi(){const l=listT(),i=l.filter(t=>t.type=="in").reduce((a,t)=>a+t.amt,0),o=l.filter(t=>t.type=="out").reduce((a,t)=>a+t.amt,0),
+ opt=(arr,v)=>arr.map(([k,n])=>`<option value="${k}" ${v==k?"selected":""}>${n}</option>`).join("");
+ return`<input type="search" placeholder="Cari keterangan atau kategori" value="${FT.q}" onchange="FT.q=this.value;r()">
+ <div class="g2"><select onchange="FT.type=this.value;r()">${opt([["all","Semua jenis"],["in","Masuk"],["out","Keluar"],["tf","Transfer"]],FT.type)}</select>
+ <select onchange="FT.p=this.value;r()">${opt([["all","Semua waktu"],["today","Hari ini"],["yday","Kemarin"],["week","7 hari terakhir"],["month","Bulan ini"],["range","Rentang tanggal"]],FT.p)}</select>
+ <select onchange="FT.c=this.value;r()">${opt([["all","Semua kategori"],...[...S.exp,...S.inc].map(c=>[c.id,c.name])],FT.c)}</select>
+ <select onchange="FT.w=this.value;r()">${opt([["all","Semua dompet"],...S.st.map(x=>[x.id,x.name])],FT.w)}</select></div>
+ <select onchange="FT.by=this.value;r()">${opt([["all","Semua pembuat"],...[...new Set(S.tx.map(t=>t.by||"-"))].map(x=>[x,x])],FT.by)}</select>
+ ${FT.p=="range"?`<div class="g2"><input type="date" value="${FT.a}" onchange="FT.a=this.value;r()"><input type="date" value="${FT.z}" onchange="FT.z=this.value;r()"></div>`:""}
+ <div class="row" style="margin:8px 2px 10px"><span class="mu">${l.length} transaksi · <span class="in">${rp(i)}</span> · <span class="ou">${rp(o)}</span></span><button class="b s sm" onclick="Object.assign(FT,fdef());r()">Reset</button></div>
+ ${l.map(txRow).join("")||'<p class="mu">Tidak ada transaksi yang cocok.</p>'}`},
+kategori(){return`<h3>Pengeluaran</h3>`+S.exp.map(c=>`<div class="card"><div class="row"><b>${c.name}</b><span>${ib("exp",c.id)}</span></div>
+ ${c.subs.map((s,i)=>`<div class="row mu">└ ${s}<span>${ib("subs",c.id,i)}</span></div>`).join("")}
+ <button class="b s" onclick="add('subs','${c.id}')">+ Sub kategori</button></div>`).join("")+`<button class="b" onclick="add('exp')">+ Kategori pengeluaran</button>
+ <h3>Pemasukan</h3>`+S.inc.map(c=>`<div class="card row"><b>${c.name}</b><span>${ib("inc",c.id)}</span></div>`).join("")+`<button class="b" onclick="add('inc')">+ Kategori pemasukan</button>`},
+penyimpanan(){return S.st.map(s=>`<div class="card row"><div><b>${s.name}</b><div class="mu">Saldo awal ${rp(s.init)}</div></div><div style="text-align:right"><b>${rp(bal(s.id))}</b><br>${ib("st",s.id)}</div></div>`).join("")+
+ `<div class="card row"><b>Total</b><b>${rp(S.st.reduce((a,s)=>a+bal(s.id),0))}</b></div><button class="b" onclick="add('st')">+ Dompet</button>`},
+tagihan(){return S.bills.map(b=>`<div class="card row"><div><b>${b.name}</b><div class="mu">${rp(b.amt)} · tiap tgl ${b.day}</div></div><div>
+ <button class="b sm" onclick="payBill('${b.id}')">Bayar</button> ${ib("bills",b.id)}</div></div>`).join("")+`<button class="b" onclick="add('bills')">+ Tagihan</button>`},
+profil(){return`<div class="card">${FB.apiKey?(user?`<b>${user.email}</b><button class="b s" onclick="fb.signOut(fb.auth)">Keluar</button>`:
+ `<b>Masuk</b><input id="em" type="email" placeholder="email"><button class="b" onclick="sendLink()">Kirim link masuk</button>`):`<b>Mode lokal</b><div class="mu">Isi konfigurasi Firebase di bagian atas file agar data tersimpan di cloud.</div>`}</div>
+ <h3>Pengaturan</h3><button class="card row lnk" onclick="go('kategori')"><span>Kelola kategori</span>${IC.chev}</button>
+ <div class="mu" style="margin:12px 2px 2px">Tampilan</div><div class="tg">${[["light","Terang"],["dark","Gelap"],["auto","Otomatis"]].map(x=>`<button class="b ${getT()==x[0]?"on":""}" onclick="setTheme('${x[0]}')">${x[1]}</button>`).join("")}</div>
+ <h3>Member</h3>${S.members.map((m,i)=>`<div class="card row">${m}<button class="i d" onclick="S.members.splice(${i},1);save();r()">🗑</button></div>`).join("")}
+ <button class="b" onclick="addMember()">+ Tambah member</button>
+ <h3>Instal aplikasi</h3><div class="card"><button class="b" onclick="inst()">Instal di perangkat ini</button>
+ <div class="mu">iPhone: Safari → Bagikan → Tambah ke Layar Utama. Android: tombol di atas atau menu Chrome → Instal aplikasi.</div></div>`}};
+window.addMember=()=>dlg("Tambah member",[{l:"Email member",v:"",t:"email"}],async v=>{const e=v[0].trim().toLowerCase();if(!e)return;S.members.push(e);save();
+ if(fb)try{await fb.sendPasswordResetEmail(fb.auth,e)}catch(x){}r()});
+window.inst=async()=>{if(dip){dip.prompt();dip=null}else alert("Gunakan menu browser → Tambah ke Layar Utama / Instal aplikasi.")};
+addEventListener("beforeinstallprompt",e=>{e.preventDefault();dip=e});
+window.payBill=id=>{const b=S.bills.find(x=>x.id==id),c=S.exp.find(x=>x.name=="Tagihan");
+ M={id:null,type:"out",amt:b.amt,date:today(),st:S.st[0].id,to:S.st[1]?.id,cat:c?.id,sub:"",note:b.name};form()};
+// ---------- Form transaksi ----------
+window.openTx=()=>{M={id:null,type:"out",amt:"",date:today(),st:S.st[0].id,to:S.st[1]?.id,cat:S.exp[0]?.id,sub:"",note:""};form()};
+window.editTx=id=>{M={...S.tx.find(t=>t.id==id)};form()};
+window.delTx=id=>dlg("Hapus transaksi?",[{t:"msg",v:"Transaksi ini akan dihapus."}],()=>{S.tx=S.tx.filter(t=>t.id!=id);save();r()},"Hapus");
+window.setT=t=>{M.type=t;M.cat=t=="in"?S.inc[0]?.id:t=="out"?S.exp[0]?.id:null;M.sub="";form()};
+window.m=(k,v)=>{M[k]=v;if(k=="cat"){M.sub="";form()}};
+function form(){const cats=M.type=="in"?S.inc:S.exp,c=S.exp.find(x=>x.id==M.cat),so=a=>S.st.map(s=>`<option value="${s.id}" ${a==s.id?"selected":""}>${s.name}</option>`).join("");
+ $("#md").innerHTML=`<div class="ov"><div class="md"><div class="row"><b>${M.id?"Edit":"Catat"} transaksi</b><button class="i" onclick="closeM()">✕</button></div>
+ <div class="tg">${[["in","Masuk"],["out","Keluar"],["tf","Transfer"]].map(x=>`<button class="b s ${M.type==x[0]?"on":""}" onclick="setT('${x[0]}')">${x[1]}</button>`).join("")}</div>
+ <div class="g2"><button class="b s" onclick="voice()">Voice</button><button class="b s" onclick="$('#fl').click()">Foto struk</button></div>
+ <input id="fl" type="file" accept="image/*" capture="environment" hidden onchange="scan(this.files[0])"><div id="ns" class="mu"></div>
+ <input type="number" inputmode="numeric" placeholder="Nominal" value="${M.amt}" oninput="m('amt',+this.value)">
+ <input type="date" value="${M.date}" onchange="m('date',this.value)">
+ <select onchange="m('st',this.value)">${so(M.st)}</select>
+ ${M.type=="tf"?`<div class="mu">Ke dompet:</div><select onchange="m('to',this.value)">${so(M.to)}</select>`:
+ `<select onchange="m('cat',this.value)">${cats.map(x=>`<option value="${x.id}" ${M.cat==x.id?"selected":""}>${x.name}</option>`).join("")}</select>
+ ${M.type=="out"&&c&&c.subs.length?`<select onchange="m('sub',this.value)"><option value="">Tanpa sub kategori</option>${c.subs.map(s=>`<option ${M.sub==s?"selected":""}>${s}</option>`).join("")}</select>`:""}`}
+ <input placeholder="Keterangan / untuk apa" value="${M.note||""}" oninput="m('note',this.value)">
+ <button class="b" onclick="saveTx()">Simpan</button></div></div>`}
+window.closeM=()=>{$("#md").innerHTML="";M=null};
+window.saveTx=()=>{if(!(M.amt>0))return note("Isi nominal");if(M.type=="tf"&&M.st==M.to)return note("Asal dan tujuan sama");
+ M.amt=+M.amt;if(M.id)S.tx=S.tx.map(t=>t.id==M.id?M:t);else S.tx.push({...M,id:uid(),by:who()});save();closeM();r()};
+// ---------- Voice ----------
+const num=s=>{s=s.toLowerCase();let m=s.match(/(\d+(?:[.,]\d+)?)\s*(juta|jt|ribu|rb|k)?/);if(!m)return 0;
+ let n=parseFloat(m[1].replace(/\./g,"").replace(",","."));if(/^\d+[.,]\d+$/.test(m[1])&&/[.]/.test(m[1])&&m[2]){n=parseFloat(m[1].replace(",","."))}
+ const u=m[2];return u=="juta"||u=="jt"?n*1e6:u?n*1e3:n};
+function fillFrom(t,l){const low=t.toLowerCase(),f=S.st.map(s=>({s,i:low.indexOf(s.name.toLowerCase())})).filter(x=>x.i>=0).sort((a,b)=>a.i-b.i);
+ M.note=t;const a=num(low);if(a)M.amt=a;
+ if(f.length>=2||/\b(pindah|transfer|ambil)\b/.test(low)&&f.length){M.type="tf";const ke=low.indexOf(" ke ");
+  let src=f[0].s,dst=f[1]?.s;if(/\bdari\b/.test(low)&&f.length>1){const di=low.indexOf("dari");f.sort((x,y)=>Math.abs(x.i-di)-Math.abs(y.i-di));}
+  if(f.length>1&&ke>0){src=f.filter(x=>x.i<ke)[0]?.s||src;dst=f.filter(x=>x.i>ke)[0]?.s||dst}M.st=src.id;if(dst)M.to=dst.id;M.cat=null;}
+ else{M.type=/\b(terima|gaji|masuk|dapat|pemasukan|omzet|terjual)\b/.test(low)?"in":"out";if(f[0])M.st=f[0].s.id;
+  const cs=M.type=="in"?S.inc:S.exp,hit=cs.find(c=>low.includes(c.name.toLowerCase()))||(M.type=="out"?guess(low):null);
+  M.cat=hit?.id||cs[0]?.id;const h=hit?.subs?.find(s=>low.includes(s.toLowerCase()));M.sub=h||""}
+ form();$("#ns").textContent=l+" Lengkapi yang belum sesuai."}
+function guess(l){const map=[[/makan|nasi|kopi|resto|warung|minum/,"Makan"],[/jajan|snack|es |cemilan/,"Jajan"],[/wifi|listrik|kontrakan|kur|cicilan|tagihan|pulsa/,"Tagihan"],[/bahan|botol|ongkir|packing|iklan|stok/,"Bisnis"],[/bulanan|belanja|galon|gas/,"Bulanan"]];
+ for(const[r,n]of map)if(r.test(l))return S.exp.find(c=>c.name==n)}
+window.voice=()=>{const R=window.SpeechRecognition||window.webkitSpeechRecognition;if(!R)return alert("Browser tidak mendukung voice. Pakai Chrome/Safari terbaru.");
+ const x=new R();x.lang="id-ID";$("#ns").textContent="🎙️ Mendengarkan...";x.onresult=e=>fillFrom(e.results[0][0].transcript,"Terdengar: “"+e.results[0][0].transcript+"”.");
+ x.onerror=()=>$("#ns").textContent="Voice gagal, coba lagi.";x.start()};
+// ---------- Struk (OCR) ----------
+window.scan=async f=>{if(!f)return;$("#ns").textContent="Membaca struk...";
+ try{if(!window.Tesseract)await new Promise((a,b)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.0/dist/tesseract.min.js";s.onload=a;s.onerror=b;document.head.append(s)});
+  const{data}=await Tesseract.recognize(f,"ind"),tx=data.text,lines=tx.split("\n");
+  let tot=0;for(const L of lines)if(/total|jumlah|bayar|grand/i.test(L)){const ns=[...L.matchAll(/\d[\d.,]{2,}/g)].map(x=>parseInt(x[0].replace(/[.,]/g,""))).filter(Boolean);if(ns.length)tot=Math.max(tot,...ns)}
+  if(!tot){const ns=[...tx.matchAll(/\d{1,3}(?:[.,]\d{3})+/g)].map(x=>parseInt(x[0].replace(/[.,]/g,"")));tot=Math.max(0,...ns)}
+  M.type="out";if(tot)M.amt=tot;M.note=(lines.find(l=>l.trim().length>3)||"Struk").trim().slice(0,40);const g=guess(tx.toLowerCase());M.cat=(g||S.exp[0]).id;
+  form();$("#ns").textContent="Struk terbaca (total "+rp(tot)+"). Cek & lengkapi.";}
+ catch(e){$("#ns").textContent="Gagal membaca struk, isi manual."}};
+// ---------- Tema ----------
+const getT=()=>{try{return localStorage.getItem("mmTheme")||"auto"}catch(e){return"auto"}};
+function applyTheme(){const v=getT(),h=document.documentElement;v=="auto"?h.removeAttribute("data-theme"):h.setAttribute("data-theme",v)}
+window.setTheme=v=>{try{localStorage.setItem("mmTheme",v)}catch(e){}applyTheme();r()};
+// ---------- Render ----------
+const tabs=[["home",IC.home,"Home"],["transaksi",IC.tx,"Transaksi"],["penyimpanan",IC.wallet,"Dompet"],["tagihan",IC.cal,"Tagihan"]];
+const TT={transaksi:"Transaksi",penyimpanan:"Dompet",tagihan:"Tagihan",profil:"Profil",kategori:"Kategori"};
+window.go=t=>{tab=t;r();scrollTo(0,0)};
+window.r=()=>{const lock=FB.apiKey&&!user&&tab!="profil",pg=lock?"profil":tab;
+ $("#mn").innerHTML=(TT[pg]?`<h2 class="pt">${TT[pg]}</h2>`:"")+T[pg]();
+ $("#nv").innerHTML=tabs.map(t=>`<button class="${tab==t[0]?"on":""}" onclick="go('${t[0]}')"><span>${t[1]}</span>${t[2]}</button>`).join("");
+ const bk=pg=="home"?`<button class="ib2" onclick="go('profil')">${IC.user}</button>`:pg=="profil"?`<button class="ib2" onclick="go('home')">${IC.back}</button>`:pg=="kategori"?`<button class="ib2" onclick="go('profil')">${IC.back}</button>`:"";
+ $("#hd").innerHTML=`<div>${bk}</div><div class="ht">Finance Calculator</div><div></div>`};
+Object.assign(window,{F,FT,fdef,sendLink,S:new Proxy({},{get:(_,k)=>S[k]}),$});
+Object.defineProperty(window,"tab",{get:()=>tab,set:v=>tab=v});
+Object.defineProperty(window,"fb",{get:()=>fb});
+addEventListener("keydown",e=>{if(!M||document.querySelector(".dl"))return;if(e.key=="Escape")closeM();else if(e.key=="Enter"&&e.target.tagName=="INPUT"&&e.target.type!="file")saveTx()});
+applyTheme();r();initFB().catch(e=>console.error(e));
+</script></body></html>
