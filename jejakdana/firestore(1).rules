@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    // Profil pribadi (nama, foto)
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Grup (ledger): dompet, kategori, tagihan, transaksi, member
+    match /ledgers/{id} {
+      function isMember() {
+        return signedIn() && request.auth.token.email in resource.data.members;
+      }
+      function isOwner() {
+        return signedIn() && (resource.data.owner == request.auth.token.email || request.auth.uid == id);
+      }
+      function changed() {
+        return request.resource.data.diff(resource.data).affectedKeys();
+      }
+
+      allow read: if isMember() || isOwner();
+
+      allow create: if signedIn()
+        && request.resource.data.owner == request.auth.token.email
+        && request.auth.token.email in request.resource.data.members;
+
+      allow delete: if isOwner();
+
+      allow update: if isOwner()
+        // member: boleh ubah data, bukan owner/members/name
+        || (isMember() && !changed().hasAny(['owner', 'members', 'name']))
+        // member: boleh keluar sendiri dari grup
+        || (isMember() && changed().hasOnly(['members'])
+            && !(request.auth.token.email in request.resource.data.members)
+            && request.resource.data.members.size() == resource.data.members.size() - 1);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
