@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="id"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f766e"><title>Money Management</title>
+<meta name="theme-color" content="#0f766e"><title>JejakDana</title><script>try{var v=localStorage.getItem("mmTheme")||"light";if(v!="auto")document.documentElement.setAttribute("data-theme",v)}catch(e){}</script>
 <style>
 :root{--bg:#f3f6fc;--cd:#fff;--tx:#0b1b3a;--mu:#6b7a99;--pr:#1d4ed8;--pr2:#3b82f6;--soft:#eaf1ff;--in:#059669;--ou:#dc2626;--bd:#e2e9f5;--sh:0 6px 20px rgba(29,78,216,.08)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0a1020;--cd:#121a2e;--tx:#e8eefc;--mu:#93a1c4;--soft:#1a2644;--bd:#232f4d;--in:#34d399;--ou:#f87171;--sh:0 6px 20px rgba(0,0,0,.3)}}
@@ -48,8 +48,17 @@ button.i{display:grid;place-items:center}button.i svg{width:15px;height:15px}nav
 .lnk{width:100%;color:var(--tx);font:inherit;text-align:left;cursor:pointer;color:var(--tx)}.lnk svg{width:18px;height:18px;color:var(--mu)}
 input[type=search]{-webkit-appearance:none;appearance:none}.by{display:inline-block;background:var(--soft);color:var(--pr2);border-radius:8px;padding:1px 8px;font-size:11.5px;margin-top:3px}
 .dl{z-index:20}
+.wg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.wc{aspect-ratio:1/1;margin:0;display:flex;flex-direction:column;justify-content:space-between;min-width:0;overflow:hidden}
+.wc .nm{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.wc .bl{font-size:clamp(14px,4.6vw,20px);font-weight:700;word-break:break-word;margin-top:2px}
+.wc.add{border:2px dashed var(--bd);background:transparent;box-shadow:none;color:var(--pr2);align-items:center;justify-content:center;font:600 15px inherit;cursor:pointer}
+.av{width:44px;height:44px;border-radius:50%;background:var(--soft) center/cover;color:var(--pr2);display:grid;place-items:center;font-weight:700;overflow:hidden;flex:none}
+.av.lg{width:80px;height:80px;font-size:30px}.ib2{overflow:hidden}.ib2 .av{width:100%;height:100%}
+.hs{font-size:11px;font-weight:500;color:var(--mu);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button.lnk.on{border-color:var(--pr2)}
 </style></head><body>
-<header id="hd">Money Management</header><main id="mn"></main>
+<header id="hd">JejakDana</header><main id="mn"></main>
 <div id="md"></div><nav id="nv"></nav>
 <script type="module">
 // ===== KONFIGURASI FIREBASE (isi dari Firebase Console > Project settings > Web app) =====
@@ -59,25 +68,55 @@ const FB={apiKey:"AIzaSyBAm39A0CckhbQXTlUatSopQRNQfq_Jdpo",authDomain:"jejakdana
 const $=s=>document.querySelector(s),uid=()=>Math.random().toString(36).slice(2,9);
 const rp=n=>"Rp"+Math.round(n||0).toLocaleString("id-ID");
 const today=()=>new Date().toISOString().slice(0,10);
-const mk=a=>a.map(n=>({id:uid(),name:n}));
-let S=JSON.parse(localStorage.getItem("mm")||"null")||{
- st:mk(["Dompet Sam","Dompet Syidda","BCA Sam","BCA Syidda","Dompet Rumah"]).map(x=>({...x,init:0})),
- exp:mk(["Bisnis","Jajan","Bulanan","Makan","Tagihan"]).map(x=>({...x,subs:[]})),
- inc:mk(["UMS","UNS","Shopee Lolaloli","Shopee 12Lab","Shopee Parfum Sarjana"]),
- bills:mk(["Kur","Mobil","Wifi UMS","Wifi UNS","Wifi Rumah","Kios UMS","Kios UNS","Kontrakan"]).map(x=>({...x,amt:0,day:1})),
- tx:[],members:[]};
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const emptyG=()=>({name:"",owner:"",members:[],prof:{},st:[],exp:[],inc:[],bills:[],tx:[]});
+let S=FB.apiKey?emptyG():{...emptyG(),...JSON.parse(localStorage.getItem("mm")||"{}")},GL=[],ld=false,P=JSON.parse(localStorage.getItem("mmP")||"null")||{n:"",p:""};
 let LID=null,tab="home",F={p:"month",c:"all",a:today(),z:today()},M=null,fb=null,user=null,dip=null;
-async function save(){localStorage.setItem("mm",JSON.stringify(S));
- if(fb&&user&&user.emailVerified)try{await fb.setDoc(fb.doc(fb.db,"ledgers",LID||user.uid),S)}catch(e){alert("Gagal sync: "+e.message)}}
+let B=null,unsub=null;
+const AK=["st","exp","inc","bills","tx"],cl=o=>JSON.parse(JSON.stringify(o));
+const snapB=()=>{B={};AK.forEach(k=>B[k]=cl(S[k]||[]))};
+function delta(){const d={};AK.forEach(k=>{const b=new Map(B[k].map(x=>[x.id,JSON.stringify(x)])),cur=new Set(S[k].map(x=>x.id));
+ d[k]={rm:[...b.keys()].filter(i=>!cur.has(i)),up:S[k].filter(x=>b.get(x.id)!==JSON.stringify(x))}});return d}
+// Simpan = kirim hanya perubahan lokal, digabung ke data terbaru di server (transaksi) agar tidak menimpa member lain
+async function save(){if(!FB.apiKey){localStorage.setItem("mm",JSON.stringify(S));return}
+ if(!(fb&&user&&LID&&B))return;const id=LID,d=delta(),pk=ek(em()),me=(S.prof||{})[pk];snapB();
+ try{await fb.runTransaction(fb.db,async tr=>{const ref=gref(id),s=await tr.get(ref);if(!s.exists())throw new Error("Grup tidak ditemukan");const o=s.data(),u={};
+  AK.forEach(k=>{if(!d[k].rm.length&&!d[k].up.length)return;const a=(o[k]||[]).filter(x=>!d[k].rm.includes(x.id));
+   d[k].up.forEach(x=>{const i=a.findIndex(y=>y.id==x.id);i>=0?a[i]=x:a.push(x)});u[k]=a});
+  if(me&&JSON.stringify((o.prof||{})[pk])!==JSON.stringify(me))u["prof."+pk]=me;
+  if(Object.keys(u).length)tr.update(ref,u)})}catch(e){alert("Gagal sync: "+e.message)}}
+const gref=id=>fb.doc(fb.db,"ledgers",id);
+const gup=async o=>{try{await fb.updateDoc(gref(LID),o);Object.assign(S,o);return 1}catch(e){note("Gagal: "+e.message)}};
 // ---------- Firebase ----------
 async function initFB(){if(!FB.apiKey)return;
  const v="10.14.1",b=`https://www.gstatic.com/firebasejs/${v}/`;
  const [A,Au,Fs]=await Promise.all([import(b+"firebase-app.js"),import(b+"firebase-auth.js"),import(b+"firebase-firestore.js")]);
  const app=A.initializeApp(FB),auth=Au.getAuth(app);fb={...Au,...Fs,auth,db:Fs.getFirestore(app)};
- fb.onAuthStateChanged(auth,async u=>{user=u;LID=null;if(u&&u.emailVerified)await loadLedger(u);r()})}
-async function loadLedger(u){LID=null;try{const q=await fb.getDocs(fb.query(fb.collection(fb.db,"ledgers"),fb.where("members","array-contains",(u.email||"").toLowerCase())));
- if(!q.empty){LID=q.docs[0].id;S=q.docs[0].data()}else{LID=u.uid;const d=await fb.getDoc(fb.doc(fb.db,"ledgers",LID));if(d.exists())S=d.data();else await save()}}
- catch(e){alert("Gagal memuat data: "+e.message)}}
+ fb.onAuthStateChanged(auth,async u=>{unsub&&unsub();unsub=null;user=u;LID=null;S=emptyG();GL=[];if(u&&u.emailVerified){ld=true;r();await loadAll(u)}r()})}
+async function loadAll(u){ld=true;LID=null;S=emptyG();GL=[];try{const e=u.email.toLowerCase();
+ const pd=await fb.getDoc(fb.doc(fb.db,"users",u.uid));P=pd.exists()?{n:pd.data().n||"",p:pd.data().p||""}:{n:"",p:""};
+ if(!P.n){P.n=u.displayName||e.split("@")[0];try{await fb.setDoc(fb.doc(fb.db,"users",u.uid),P)}catch(_){}}
+ const q=await fb.getDocs(fb.query(fb.collection(fb.db,"ledgers"),fb.where("members","array-contains",e)));
+ const m=new Map(q.docs.map(d=>[d.id,d.data()]));
+ if(!m.has(u.uid)){const d=await fb.getDoc(gref(u.uid));if(d.exists())m.set(u.uid,d.data())}
+ for(const[id,d]of m){if(!d.owner&&id==u.uid){d.owner=e;d.members=[e,...(d.members||[]).filter(x=>x!=e)];d.name=d.name||"Grup Utama";
+   try{await fb.updateDoc(gref(id),{owner:d.owner,members:d.members,name:d.name})}catch(_){}}
+  GL.push({id,name:d.name||"Grup",owner:d.owner||""})}
+ const sel=localStorage.getItem("mmG_"+u.uid),g=GL.find(x=>x.id==sel)||GL[0];if(g)await pick(g.id)}
+ catch(x){alert("Gagal memuat data: "+x.message)}ld=false}
+async function pick(id){const d=await fb.getDoc(gref(id));if(!d.exists())return;unsub&&unsub();S={...emptyG(),...d.data()};if(!S.name)S.name="Grup";LID=id;snapB();
+ try{localStorage.setItem("mmG_"+user.uid,id)}catch(e){}
+ const k=ek(em()),c=S.prof[k]||{};if(c.n!=P.n||c.p!=P.p){S.prof={...S.prof,[k]:{n:P.n,p:P.p}};await save()}
+ unsub=fb.onSnapshot(gref(id),s=>{if(LID!=id)return;if(!s.exists()){lost("Grup ini sudah dihapus.");return}
+  S={...emptyG(),...s.data()};if(!S.name)S.name="Grup";snapB();const g=GL.find(x=>x.id==id);if(g){g.name=S.name;g.owner=S.owner}
+  const a=document.activeElement;if(!(a&&a.closest&&a.closest("#mn")&&/INPUT|SELECT/.test(a.tagName)))r()},
+  e=>{if(LID==id&&e.code=="permission-denied")lost("Anda tidak lagi punya akses ke grup ini.")})}
+function lost(m){const id=LID;GL=GL.filter(x=>x.id!=id);note(m);gone()}
+const ek=e=>(e||"").toLowerCase().replace(/\./g,"_"),em=()=>(user?.email||"").toLowerCase(),own=()=>!!S.owner&&S.owner==em();
+const okp=p=>/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(p||"")?p:"";
+const av=(n,p,c="")=>{p=okp(p);return`<div class="av ${c}"${p?` style="background-image:url(${p})"`:""}>${p?"":esc(((n||"?").trim()[0]||"?").toUpperCase())}</div>`};
+const pf=e=>(S.prof||{})[ek(e)]||{},nmOf=e=>pf(e).n||(e||"").split("@")[0]||"-";
+const dn=t=>{const e=t.be||(t.by&&t.by.includes("@")?t.by:"");return e?nmOf(e):(t.by||"-")};
 const aerr=e=>({"auth/invalid-credential":"Email atau password salah","auth/wrong-password":"Email atau password salah","auth/user-not-found":"Email atau password salah","auth/email-already-in-use":"Email sudah terdaftar, silakan masuk","auth/weak-password":"Password minimal 6 karakter","auth/invalid-email":"Format email tidak valid","auth/too-many-requests":"Terlalu banyak percobaan, coba lagi nanti","auth/network-request-failed":"Koneksi internet bermasalah"}[e.code]||e.message);
 const cred=()=>[$("#em").value.trim(),$("#pw").value];
 window.login=async()=>{const[e,p]=cred();if(!e||!p)return note("Isi email dan password");try{await fb.signInWithEmailAndPassword(fb.auth,e,p)}catch(x){note(aerr(x))}};
@@ -86,21 +125,21 @@ window.resetPw=async()=>{const e=$("#em").value.trim();if(!e)return note("Isi em
 window.resend=async()=>{try{await fb.sendEmailVerification(user);note("Link verifikasi dikirim ulang ke "+user.email)}catch(x){note(aerr(x))}};
 window.verified=async()=>{try{await user.reload();if(!user.emailVerified)return note("Email belum terverifikasi. Buka link di email, cek folder Spam.");await user.getIdToken(true);await loadLedger(user);r()}catch(x){note(aerr(x))}};
 // ---------- helpers ----------
-const sn=id=>(S.st.find(x=>x.id==id)||{}).name||"-";
-const cn=t=>{let c=[...S.exp,...S.inc].find(x=>x.id==t.cat);return c?c.name+(t.sub?" › "+t.sub:""):t.type=="tf"?"Transfer":"-"};
-function bal(id){let s=S.st.find(x=>x.id==id).init||0;S.tx.forEach(t=>{if(t.type=="in"&&t.st==id)s+=t.amt;if(t.type=="out"&&t.st==id)s-=t.amt;
+const sn=id=>esc((S.st.find(x=>x.id==id)||{}).name||"-");
+const cn=t=>{let c=[...S.exp,...S.inc].find(x=>x.id==t.cat);return c?esc(c.name+(t.sub?" › "+t.sub:"")):t.type=="tf"?"Transfer":"-"};
+function bal(id){let s=(S.st.find(x=>x.id==id)||{}).init||0;S.tx.forEach(t=>{if(t.type=="in"&&t.st==id)s+=t.amt;if(t.type=="out"&&t.st==id)s-=t.amt;
  if(t.type=="tf"){if(t.st==id)s-=t.amt;if(t.to==id)s+=t.amt}});return s}
 function range(){const d=new Date(),y=n=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n).toISOString().slice(0,10);
  if(F.p=="today")return[y(0),y(0)];if(F.p=="yday")return[y(-1),y(-1)];
  if(F.p=="range")return[F.a,F.z];const m=today().slice(0,7);return[m+"-01",m+"-31"]}
 function list(){const[a,z]=range();return S.tx.filter(t=>t.date>=a&&t.date<=z&&(F.c=="all"||t.cat==F.c)).sort((x,y)=>y.date.localeCompare(x.date))}
-const txRow=t=>`<div class="card tx"><div class="ic ${t.type}">${t.type=="in"?"↓":t.type=="out"?"↑":"⇄"}</div><div class="fl"><b>${t.note||cn(t)}</b><div class="mu">${t.date} · ${cn(t)} · ${t.type=="tf"?sn(t.st)+" → "+sn(t.to):sn(t.st)}</div><span class="by">oleh ${t.by||"-"}</span></div>
+const txRow=t=>`<div class="card tx"><div class="ic ${t.type}">${t.type=="in"?"↓":t.type=="out"?"↑":"⇄"}</div><div class="fl"><b>${esc(t.note)||cn(t)}</b><div class="mu">${t.date} · ${cn(t)} · ${t.type=="tf"?sn(t.st)+" → "+sn(t.to):sn(t.st)}</div><span class="by">oleh ${esc(dn(t))}</span></div>
 <div class="rt"><b class="${t.type=="in"?"in":t.type=="out"?"ou":""}">${t.type=="out"?"-":t.type=="in"?"+":""}${rp(t.amt)}</b><br><span class="ac"><button class="i" onclick="editTx('${t.id}')">${IC.edit}</button><button class="i d" onclick="delTx('${t.id}')">${IC.del}</button></span></div></div>`;
 const fdef=()=>({q:"",type:"all",p:"all",a:today(),z:today(),c:"all",w:"all",by:"all"});let FT=fdef();
-const who=()=>user?(user.displayName||user.email):"Saya";
+const who=()=>P.n||(user?user.email.split("@")[0]:"Saya");
 function listT(){const d=new Date(),yy=n=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n).toISOString().slice(0,10);let a="0000",z="9999";
  if(FT.p=="today")a=z=yy(0);else if(FT.p=="yday")a=z=yy(-1);else if(FT.p=="week"){a=yy(-6);z=yy(0)}else if(FT.p=="month"){a=today().slice(0,7)+"-01";z=today().slice(0,7)+"-31"}else if(FT.p=="range"){a=FT.a;z=FT.z}
- const q=FT.q.toLowerCase();return S.tx.filter(t=>t.date>=a&&t.date<=z&&(FT.type=="all"||t.type==FT.type)&&(FT.c=="all"||t.cat==FT.c)&&(FT.w=="all"||t.st==FT.w||t.to==FT.w)&&(FT.by=="all"||(t.by||"-")==FT.by)&&(!q||((t.note||"")+" "+cn(t)).toLowerCase().includes(q))).sort((x,y)=>y.date.localeCompare(x.date))}
+ const q=FT.q.toLowerCase();return S.tx.filter(t=>t.date>=a&&t.date<=z&&(FT.type=="all"||t.type==FT.type)&&(FT.c=="all"||t.cat==FT.c)&&(FT.w=="all"||t.st==FT.w||t.to==FT.w)&&(FT.by=="all"||dn(t)==FT.by)&&(!q||((t.note||"")+" "+cn(t)).toLowerCase().includes(q))).sort((x,y)=>y.date.localeCompare(x.date))}
 // ---------- Dialog (Enter = OK, Esc = Batal) & CRUD ----------
 function dlg(title,fields,cb,okText="OK"){const el=document.createElement("div");el.className="ov dl";
  el.innerHTML=`<div class="md"><b>${title}</b>${fields.map((f,i)=>f.t=="msg"?`<p class="mu">${f.v}</p>`:`<div class="mu" style="margin-top:8px">${f.l}</div><input data-i="${i}" type="${f.t||"text"}" value="${String(f.v??"").replace(/"/g,"&quot;")}">`).join("")}<div class="g2" style="margin-top:12px"><button class="b s" data-x>Batal</button><button class="b" data-ok>${okText}</button></div></div>`;
@@ -123,52 +162,73 @@ const ib=(k,id,i="")=>`<span class="ac"><button class="i" onclick="edit('${k}','
 const T={
 home(){const l=list(),i=l.filter(t=>t.type=="in").reduce((a,t)=>a+t.amt,0),o=l.filter(t=>t.type=="out").reduce((a,t)=>a+t.amt,0);
  return`<div class="hero"><div class="hl">Total saldo</div><div class="hb">${rp(S.st.reduce((a,x)=>a+bal(x.id),0))}</div><div class="hr"><div class="chip"><span>↓ Masuk</span><b>${rp(i)}</b></div><div class="chip"><span>↑ Keluar</span><b>${rp(o)}</b></div></div></div><div class="g2"><select onchange="F.p=this.value;r()">${[["month","Bulan ini"],["today","Hari ini"],["yday","Kemarin"],["range","Rentang tanggal"]].map(x=>`<option value="${x[0]}" ${F.p==x[0]?"selected":""}>${x[1]}</option>`).join("")}</select>
- <select onchange="F.c=this.value;r()"><option value="all">Semua kategori</option>${[...S.exp,...S.inc].map(c=>`<option value="${c.id}" ${F.c==c.id?"selected":""}>${c.name}</option>`).join("")}</select></div>
+ <select onchange="F.c=this.value;r()"><option value="all">Semua kategori</option>${[...S.exp,...S.inc].map(c=>`<option value="${c.id}" ${F.c==c.id?"selected":""}>${esc(c.name)}</option>`).join("")}</select></div>
  ${F.p=="range"?`<div class="g2"><input type="date" value="${F.a}" onchange="F.a=this.value;r()"><input type="date" value="${F.z}" onchange="F.z=this.value;r()"></div>`:""}
  
- <h3>Transaksi</h3>${l.slice(0,30).map(txRow).join("")||'<p class="mu">Belum ada transaksi.</p>'}<button class="fab" onclick="openTx()">+</button>`},
+ ${S.st.length&&(S.exp.length||S.inc.length)?"":`<div class="card"><b>Grup ini masih kosong</b><div class="mu">Buat dompet dan kategori lebih dulu sebelum mencatat transaksi.</div><div class="g2" style="margin-top:8px"><button class="b s" onclick="go('penyimpanan')">Buat dompet</button><button class="b s" onclick="go('kategori')">Buat kategori</button></div></div>`}<h3>Transaksi</h3>${l.slice(0,30).map(txRow).join("")||'<p class="mu">Belum ada transaksi.</p>'}<button class="fab" onclick="openTx()">+</button>`},
 transaksi(){const l=listT(),i=l.filter(t=>t.type=="in").reduce((a,t)=>a+t.amt,0),o=l.filter(t=>t.type=="out").reduce((a,t)=>a+t.amt,0),
- opt=(arr,v)=>arr.map(([k,n])=>`<option value="${k}" ${v==k?"selected":""}>${n}</option>`).join("");
+ opt=(arr,v)=>arr.map(([k,n])=>`<option value="${esc(k)}" ${v==k?"selected":""}>${esc(n)}</option>`).join("");
  return`<input type="search" placeholder="Cari keterangan atau kategori" value="${FT.q}" onchange="FT.q=this.value;r()">
  <div class="g2"><select onchange="FT.type=this.value;r()">${opt([["all","Semua jenis"],["in","Masuk"],["out","Keluar"],["tf","Transfer"]],FT.type)}</select>
  <select onchange="FT.p=this.value;r()">${opt([["all","Semua waktu"],["today","Hari ini"],["yday","Kemarin"],["week","7 hari terakhir"],["month","Bulan ini"],["range","Rentang tanggal"]],FT.p)}</select>
  <select onchange="FT.c=this.value;r()">${opt([["all","Semua kategori"],...[...S.exp,...S.inc].map(c=>[c.id,c.name])],FT.c)}</select>
  <select onchange="FT.w=this.value;r()">${opt([["all","Semua dompet"],...S.st.map(x=>[x.id,x.name])],FT.w)}</select></div>
- <select onchange="FT.by=this.value;r()">${opt([["all","Semua pembuat"],...[...new Set(S.tx.map(t=>t.by||"-"))].map(x=>[x,x])],FT.by)}</select>
+ <select onchange="FT.by=this.value;r()">${opt([["all","Semua pembuat"],...[...new Set(S.tx.map(dn))].map(x=>[x,x])],FT.by)}</select>
  ${FT.p=="range"?`<div class="g2"><input type="date" value="${FT.a}" onchange="FT.a=this.value;r()"><input type="date" value="${FT.z}" onchange="FT.z=this.value;r()"></div>`:""}
  <div class="row" style="margin:8px 2px 10px"><span class="mu">${l.length} transaksi · <span class="in">${rp(i)}</span> · <span class="ou">${rp(o)}</span></span><button class="b s sm" onclick="Object.assign(FT,fdef());r()">Reset</button></div>
  ${l.map(txRow).join("")||'<p class="mu">Tidak ada transaksi yang cocok.</p>'}`},
-kategori(){return`<h3>Pengeluaran</h3>`+S.exp.map(c=>`<div class="card"><div class="row"><b>${c.name}</b><span>${ib("exp",c.id)}</span></div>
- ${c.subs.map((s,i)=>`<div class="row mu">└ ${s}<span>${ib("subs",c.id,i)}</span></div>`).join("")}
+kategori(){return(S.exp.length||S.inc.length?"":`<p class="mu">Grup ini belum punya kategori. Buat dulu kategori pengeluaran dan pemasukan.</p>`)+`<h3>Pengeluaran</h3>`+S.exp.map(c=>`<div class="card"><div class="row"><b>${esc(c.name)}</b><span>${ib("exp",c.id)}</span></div>
+ ${c.subs.map((s,i)=>`<div class="row mu">└ ${esc(s)}<span>${ib("subs",c.id,i)}</span></div>`).join("")}
  <button class="b s" onclick="add('subs','${c.id}')">+ Sub kategori</button></div>`).join("")+`<button class="b" onclick="add('exp')">+ Kategori pengeluaran</button>
- <h3>Pemasukan</h3>`+S.inc.map(c=>`<div class="card row"><b>${c.name}</b><span>${ib("inc",c.id)}</span></div>`).join("")+`<button class="b" onclick="add('inc')">+ Kategori pemasukan</button>`},
-penyimpanan(){return S.st.map(s=>`<div class="card row"><div><b>${s.name}</b><div class="mu">Saldo awal ${rp(s.init)}</div></div><div style="text-align:right"><b>${rp(bal(s.id))}</b><br>${ib("st",s.id)}</div></div>`).join("")+
- `<div class="card row"><b>Total</b><b>${rp(S.st.reduce((a,s)=>a+bal(s.id),0))}</b></div><button class="b" onclick="add('st')">+ Dompet</button>`},
-tagihan(){return S.bills.map(b=>`<div class="card row"><div><b>${b.name}</b><div class="mu">${rp(b.amt)} · tiap tgl ${b.day}</div></div><div>
+ <h3>Pemasukan</h3>`+S.inc.map(c=>`<div class="card row"><b>${esc(c.name)}</b><span>${ib("inc",c.id)}</span></div>`).join("")+`<button class="b" onclick="add('inc')">+ Kategori pemasukan</button>`},
+penyimpanan(){const tot=S.st.reduce((a,s)=>a+bal(s.id),0);return`<div class="card row"><b>Total saldo</b><b>${rp(tot)}</b></div>${S.st.length?"":'<p class="mu">Grup ini belum punya dompet. Buat dompet pertama Anda.</p>'}<div class="wg">`+S.st.map(s=>`<div class="card wc"><div class="row"><div class="ic tf">${IC.wallet}</div>${ib("st",s.id)}</div><div><b class="nm">${esc(s.name)}</b><div class="mu">Awal ${rp(s.init)}</div><div class="bl">${rp(bal(s.id))}</div></div></div>`).join("")+`<button class="card wc add" onclick="add('st')">+ Dompet</button></div>`},
+tagihan(){return(S.bills.length?"":`<p class="mu">Belum ada tagihan. Tambahkan tagihan rutin Anda.</p>`)+S.bills.map(b=>`<div class="card row"><div><b>${esc(b.name)}</b><div class="mu">${rp(b.amt)} · tiap tgl ${b.day}</div></div><div>
  <button class="b sm" onclick="payBill('${b.id}')">Bayar</button> ${ib("bills",b.id)}</div></div>`).join("")+`<button class="b" onclick="add('bills')">+ Tagihan</button>`},
 profil(){const kv=`<b>Masuk / Daftar</b><input id="em" type="email" autocomplete="email" placeholder="email"><input id="pw" type="password" autocomplete="current-password" placeholder="password (min. 6 karakter)" onkeydown="if(event.key=='Enter')login()"><button class="b" onclick="login()">Masuk</button><button class="b s" onclick="register()">Daftar akun baru</button><button class="b s" onclick="resetPw()">Lupa password</button>`,
- vf=`<b>Verifikasi email</b><div class="mu">Kami mengirim link verifikasi ke ${user?.email}. Buka link itu, lalu tekan tombol di bawah.</div><button class="b" onclick="verified()">Saya sudah verifikasi</button><button class="b s" onclick="resend()">Kirim ulang link</button><button class="b s" onclick="fb.signOut(fb.auth)">Keluar</button>`,
- ok=`<b>${user?.email}</b><button class="b s" onclick="fb.signOut(fb.auth)">Keluar</button>`;
- return`<div class="card">${FB.apiKey?(!user?kv:!user.emailVerified?vf:ok):`<b>Mode lokal</b><div class="mu">Isi konfigurasi Firebase di bagian atas file agar data tersimpan di cloud.</div>`}</div>
- <h3>Pengaturan</h3><button class="card row lnk" onclick="go('kategori')"><span>Kelola kategori</span>${IC.chev}</button>
- <div class="mu" style="margin:12px 2px 2px">Tampilan</div><div class="tg">${[["light","Terang"],["dark","Gelap"],["auto","Otomatis"]].map(x=>`<button class="b ${getT()==x[0]?"on":""}" onclick="setTheme('${x[0]}')">${x[1]}</button>`).join("")}</div>
- <h3>Member</h3>${S.members.map((m,i)=>`<div class="card row">${m}<button class="i d" onclick="S.members.splice(${i},1);save();r()">🗑</button></div>`).join("")}
- <button class="b" onclick="addMember()">+ Tambah member</button>
+ vf=`<b>Verifikasi email</b><div class="mu">Kami mengirim link verifikasi ke ${esc(user?.email)}. Buka link itu, lalu tekan tombol di bawah.</div><button class="b" onclick="verified()">Saya sudah verifikasi</button><button class="b s" onclick="resend()">Kirim ulang link</button><button class="b s" onclick="fb.signOut(fb.auth)">Keluar</button>`,
+ ready=!FB.apiKey||(user&&user.emailVerified),
+ acc=`<div class="card"><div class="tx">${av(P.n||user?.email,P.p,"lg")}<div class="fl"><b style="font-size:18px">${esc(P.n||"Tanpa nama")}</b><div class="mu">${esc(user?.email||"Mode lokal")}</div></div></div><div class="g2" style="margin-top:10px"><button class="b s" onclick="$('#pf').click()">${P.p?"Ganti foto":"Tambah foto"}</button><button class="b s" onclick="editName()">Ubah nama</button></div>${P.p?`<button class="b s" onclick="delPhoto()">Hapus foto</button>`:""}<input id="pf" type="file" accept="image/*" hidden onchange="pickPhoto(this.files[0]);this.value=''">${user?`<button class="b s" onclick="fb.signOut(fb.auth)">Keluar</button>`:""}</div>`;
+ let h=ready?acc:`<div class="card">${!user?kv:vf}</div>`;
+ if(ready&&FB.apiKey){h+=`<h3>Grup</h3>`+(GL.map(g=>`<button class="card row lnk ${g.id==LID?"on":""}" onclick="switchG('${g.id}')"><span><b>${esc(g.name)}</b><div class="mu">${g.owner&&g.owner==em()?"Pemilik":"Member"}</div></span>${g.id==LID?"✓":IC.chev}</button>`).join("")||`<p class="mu">${ld?"Memuat grup…":"Anda belum punya grup. Buat grup baru, atau minta pemilik grup menambahkan email Anda."}</p>`)+`<button class="b" onclick="newGroup()">+ Buat grup baru</button>`;
+  if(LID)h+=`<h3>Pengaturan grup</h3><div class="card row"><div><div class="mu">Nama grup</div><b>${esc(S.name)}</b></div>${own()?`<button class="i" onclick="renameG()">${IC.edit}</button>`:""}</div>`}
+ if(ready&&(LID||!FB.apiKey))h+=(FB.apiKey?"":`<h3>Pengaturan</h3>`)+`<button class="card row lnk" onclick="go('kategori')"><span>Kelola kategori</span>${IC.chev}</button>`;
+ if(ready&&FB.apiKey&&LID){h+=`<h3>Member</h3>`+S.members.map((e,i)=>`<div class="card row"><span class="tx">${av(nmOf(e),pf(e).p)}<span><b>${esc(nmOf(e))}${e==S.owner?' <span class="by">Pemilik</span>':""}</b><div class="mu">${esc(e)}</div></span></span>${own()&&e!=S.owner?`<button class="i d" onclick="rmMember(${i})">${IC.del}</button>`:""}</div>`).join("")+
+  (own()?`<button class="b" onclick="addMember()">+ Tambah member</button><button class="b s" onclick="transferG()">Transfer kepemilikan</button><button class="b s" style="color:var(--ou)" onclick="delG()">Hapus grup</button>`:`<button class="b s" style="color:var(--ou)" onclick="leaveG()">Keluar dari grup</button>`)}
+ return h+`<div class="mu" style="margin:12px 2px 2px">Tampilan</div><div class="tg">${[["light","Terang"],["dark","Gelap"],["auto","Otomatis"]].map(x=>`<button class="b ${getT()==x[0]?"on":""}" onclick="setTheme('${x[0]}')">${x[1]}</button>`).join("")}</div>
  <h3>Instal aplikasi</h3><div class="card"><button class="b" onclick="inst()">Instal di perangkat ini</button>
  <div class="mu">iPhone: Safari → Bagikan → Tambah ke Layar Utama. Android: tombol di atas atau menu Chrome → Instal aplikasi.</div></div>`}};
-window.addMember=()=>dlg("Tambah member",[{l:"Email member",v:"",t:"email"}],async v=>{const e=v[0].trim().toLowerCase();if(!e)return;S.members.push(e);save();
- r();note("Member ditambahkan. Minta "+e+" mendaftar dengan email ini di aplikasi, lalu verifikasi emailnya.")});
+window.addMember=()=>dlg("Tambah member",[{l:"Email member",v:"",t:"email"}],async v=>{const e=v[0].trim().toLowerCase();if(!e)return;if(S.members.includes(e))return note("Email itu sudah menjadi member.");
+ if(await gup({members:[...S.members,e]})){r();note("Member ditambahkan. Minta "+e+" mendaftar dengan email ini dan verifikasi emailnya, lalu grup ini muncul di profilnya.")}});
+window.rmMember=i=>{const e=S.members[i];dlg("Keluarkan member?",[{t:"msg",v:"Member ini tidak akan bisa mengakses grup lagi."}],async()=>{if(await gup({members:S.members.filter(x=>x!=e)}))r()},"Keluarkan")};
+window.newGroup=()=>dlg("Buat grup baru",[{l:"Nama grup",v:""}],async v=>{const n=v[0].trim();if(!n)return;const e=em(),ref=fb.doc(fb.collection(fb.db,"ledgers"));
+ try{await fb.setDoc(ref,{...emptyG(),name:n,owner:e,members:[e],prof:{[ek(e)]:{n:P.n,p:P.p}}});GL.push({id:ref.id,name:n,owner:e});await pick(ref.id);resetF();r()}catch(x){note("Gagal membuat grup: "+x.message)}},"Buat");
+const resetF=()=>{Object.assign(FT,fdef());Object.assign(F,{p:"month",c:"all",a:today(),z:today()})};
+window.switchG=async id=>{if(id==LID)return;await pick(id);resetF();r()};
+window.renameG=()=>dlg("Ubah nama grup",[{l:"Nama grup",v:S.name}],async v=>{const n=v[0].trim();if(n&&await gup({name:n})){GL.find(x=>x.id==LID).name=n;r()}});
+async function gone(){unsub&&unsub();unsub=null;LID=null;S=emptyG();if(GL[0])await pick(GL[0].id);resetF();r()}
+window.leaveG=()=>dlg("Keluar dari grup?",[{t:"msg",v:"Anda tidak akan bisa mengakses grup ini lagi kecuali ditambahkan kembali oleh pemilik."}],async()=>{try{unsub&&unsub();unsub=null;await fb.updateDoc(gref(LID),{members:S.members.filter(x=>x!=em())});GL=GL.filter(x=>x.id!=LID);await gone()}catch(x){note("Gagal: "+x.message)}},"Keluar");
+window.delG=()=>dlg("Hapus grup?",[{t:"msg",v:"Semua data grup ini (transaksi, dompet, kategori, tagihan) dihapus permanen untuk semua member."}],async()=>{try{unsub&&unsub();unsub=null;await fb.deleteDoc(gref(LID));GL=GL.filter(x=>x.id!=LID);await gone()}catch(x){note("Gagal: "+x.message)}},"Hapus");
+window.transferG=()=>{const o=S.members.filter(x=>x!=em());if(!o.length)return note("Tambahkan member lain dulu sebelum mentransfer kepemilikan.");
+ $("#md").innerHTML=`<div class="ov"><div class="md"><div class="row"><b>Transfer kepemilikan</b><button class="i" onclick="closeM()">✕</button></div><p class="mu">Pilih member yang akan menjadi pemilik baru. Anda tetap menjadi member biasa.</p>${o.map((e,i)=>`<button class="card row lnk" onclick="doTransfer(${i})"><span class="tx">${av(nmOf(e),pf(e).p)}<span><b>${esc(nmOf(e))}</b><div class="mu">${esc(e)}</div></span></span>${IC.chev}</button>`).join("")}</div></div>`;window._o=o};
+window.doTransfer=i=>{const e=window._o[i];closeM();dlg("Transfer kepemilikan?",[{t:"msg",v:"Pemilik grup akan menjadi "+nmOf(e)+". Setelah itu hanya pemilik baru yang bisa mengelola member, nama, dan menghapus grup."}],async()=>{if(await gup({owner:e})){GL.find(x=>x.id==LID).owner=e;r()}},"Transfer")};
+// ---------- Profil ----------
+async function saveProf(){try{if(FB.apiKey){await fb.setDoc(fb.doc(fb.db,"users",user.uid),P);try{await fb.updateProfile(user,{displayName:P.n})}catch(_){}
+ if(LID){S.prof={...S.prof,[ek(em())]:{n:P.n,p:P.p}};await save()}}else localStorage.setItem("mmP",JSON.stringify(P))}catch(x){note("Gagal menyimpan profil: "+x.message)}r()}
+window.editName=()=>dlg("Ubah nama",[{l:"Nama",v:P.n}],v=>{const n=v[0].trim();if(n){P.n=n;saveProf()}});
+window.delPhoto=()=>{P.p="";saveProf()};
+window.pickPhoto=f=>{if(!f)return;const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const c=document.createElement("canvas"),n=160,s=Math.min(im.width,im.height);c.width=c.height=n;
+ c.getContext("2d").drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,n,n);URL.revokeObjectURL(u);P.p=c.toDataURL("image/jpeg",.8);saveProf()};im.onerror=()=>note("File gambar tidak valid.");im.src=u};
 window.inst=async()=>{if(dip){dip.prompt();dip=null}else alert("Gunakan menu browser → Tambah ke Layar Utama / Instal aplikasi.")};
 addEventListener("beforeinstallprompt",e=>{e.preventDefault();dip=e});
-window.payBill=id=>{const b=S.bills.find(x=>x.id==id),c=S.exp.find(x=>x.name=="Tagihan");
+window.payBill=id=>{if(!S.st.length)return note("Buat dompet dulu di tab Dompet.");const b=S.bills.find(x=>x.id==id),c=S.exp.find(x=>x.name=="Tagihan");
  M={id:null,type:"out",amt:b.amt,date:today(),st:S.st[0].id,to:S.st[1]?.id,cat:c?.id,sub:"",note:b.name};form()};
 // ---------- Form transaksi ----------
-window.openTx=()=>{M={id:null,type:"out",amt:"",date:today(),st:S.st[0].id,to:S.st[1]?.id,cat:S.exp[0]?.id,sub:"",note:""};form()};
+window.openTx=()=>{if(!S.st.length)return note("Buat dompet dulu di tab Dompet.");if(!S.exp.length&&!S.inc.length)return note("Buat kategori dulu di Profil → Kelola kategori.");M={id:null,type:"out",amt:"",date:today(),st:S.st[0].id,to:S.st[1]?.id,cat:S.exp[0]?.id,sub:"",note:""};form()};
 window.editTx=id=>{M={...S.tx.find(t=>t.id==id)};form()};
 window.delTx=id=>dlg("Hapus transaksi?",[{t:"msg",v:"Transaksi ini akan dihapus."}],()=>{S.tx=S.tx.filter(t=>t.id!=id);save();r()},"Hapus");
 window.setT=t=>{M.type=t;M.cat=t=="in"?S.inc[0]?.id:t=="out"?S.exp[0]?.id:null;M.sub="";form()};
 window.m=(k,v)=>{M[k]=v;if(k=="cat"){M.sub="";form()}};
-function form(){const cats=M.type=="in"?S.inc:S.exp,c=S.exp.find(x=>x.id==M.cat),so=a=>S.st.map(s=>`<option value="${s.id}" ${a==s.id?"selected":""}>${s.name}</option>`).join("");
+function form(){const cats=M.type=="in"?S.inc:S.exp,c=S.exp.find(x=>x.id==M.cat),so=a=>S.st.map(s=>`<option value="${s.id}" ${a==s.id?"selected":""}>${esc(s.name)}</option>`).join("");
  $("#md").innerHTML=`<div class="ov"><div class="md"><div class="row"><b>${M.id?"Edit":"Catat"} transaksi</b><button class="i" onclick="closeM()">✕</button></div>
  <div class="tg">${[["in","Masuk"],["out","Keluar"],["tf","Transfer"]].map(x=>`<button class="b s ${M.type==x[0]?"on":""}" onclick="setT('${x[0]}')">${x[1]}</button>`).join("")}</div>
  <div class="g2"><button class="b s" onclick="voice()">Voice</button><button class="b s" onclick="$('#fl').click()">Foto struk</button></div>
@@ -177,13 +237,13 @@ function form(){const cats=M.type=="in"?S.inc:S.exp,c=S.exp.find(x=>x.id==M.cat)
  <input type="date" value="${M.date}" onchange="m('date',this.value)">
  <select onchange="m('st',this.value)">${so(M.st)}</select>
  ${M.type=="tf"?`<div class="mu">Ke dompet:</div><select onchange="m('to',this.value)">${so(M.to)}</select>`:
- `<select onchange="m('cat',this.value)">${cats.map(x=>`<option value="${x.id}" ${M.cat==x.id?"selected":""}>${x.name}</option>`).join("")}</select>
- ${M.type=="out"&&c&&c.subs.length?`<select onchange="m('sub',this.value)"><option value="">Tanpa sub kategori</option>${c.subs.map(s=>`<option ${M.sub==s?"selected":""}>${s}</option>`).join("")}</select>`:""}`}
+ `<select onchange="m('cat',this.value)">${cats.map(x=>`<option value="${x.id}" ${M.cat==x.id?"selected":""}>${esc(x.name)}</option>`).join("")}</select>
+ ${M.type=="out"&&c&&c.subs.length?`<select onchange="m('sub',this.value)"><option value="">Tanpa sub kategori</option>${c.subs.map(s=>`<option ${M.sub==s?"selected":""}>${esc(s)}</option>`).join("")}</select>`:""}`}
  <input placeholder="Keterangan / untuk apa" value="${M.note||""}" oninput="m('note',this.value)">
  <button class="b" onclick="saveTx()">Simpan</button></div></div>`}
 window.closeM=()=>{$("#md").innerHTML="";M=null};
-window.saveTx=()=>{if(!(M.amt>0))return note("Isi nominal");if(M.type=="tf"&&M.st==M.to)return note("Asal dan tujuan sama");
- M.amt=+M.amt;if(M.id)S.tx=S.tx.map(t=>t.id==M.id?M:t);else S.tx.push({...M,id:uid(),by:who()});save();closeM();r()};
+window.saveTx=()=>{if(!(M.amt>0))return note("Isi nominal");if(M.type=="tf"&&(!M.to||M.st==M.to))return note(M.to?"Asal dan tujuan sama":"Transfer butuh minimal 2 dompet");
+ M.amt=+M.amt;if(M.id)S.tx=S.tx.map(t=>t.id==M.id?M:t);else S.tx.push({...M,id:uid(),by:who(),be:em()});save();closeM();r()};
 // ---------- Voice ----------
 const num=s=>{s=s.toLowerCase();let m=s.match(/(\d+(?:[.,]\d+)?)\s*(juta|jt|ribu|rb|k)?/);if(!m)return 0;
  let n=parseFloat(m[1].replace(/\./g,"").replace(",","."));if(/^\d+[.,]\d+$/.test(m[1])&&/[.]/.test(m[1])&&m[2]){n=parseFloat(m[1].replace(",","."))}
@@ -212,18 +272,18 @@ window.scan=async f=>{if(!f)return;$("#ns").textContent="Membaca struk...";
   form();$("#ns").textContent="Struk terbaca (total "+rp(tot)+"). Cek & lengkapi.";}
  catch(e){$("#ns").textContent="Gagal membaca struk, isi manual."}};
 // ---------- Tema ----------
-const getT=()=>{try{return localStorage.getItem("mmTheme")||"auto"}catch(e){return"auto"}};
+const getT=()=>{try{return localStorage.getItem("mmTheme")||"light"}catch(e){return"light"}};
 function applyTheme(){const v=getT(),h=document.documentElement;v=="auto"?h.removeAttribute("data-theme"):h.setAttribute("data-theme",v)}
 window.setTheme=v=>{try{localStorage.setItem("mmTheme",v)}catch(e){}applyTheme();r()};
 // ---------- Render ----------
 const tabs=[["home",IC.home,"Home"],["transaksi",IC.tx,"Transaksi"],["penyimpanan",IC.wallet,"Dompet"],["tagihan",IC.cal,"Tagihan"]];
 const TT={transaksi:"Transaksi",penyimpanan:"Dompet",tagihan:"Tagihan",profil:"Profil",kategori:"Kategori"};
 window.go=t=>{tab=t;r();scrollTo(0,0)};
-window.r=()=>{const lock=FB.apiKey&&(!user||!user.emailVerified)&&tab!="profil",pg=lock?"profil":tab;
+window.r=()=>{const lock=FB.apiKey&&(!user||!user.emailVerified||!LID)&&tab!="profil",pg=lock?"profil":tab;
  $("#mn").innerHTML=(TT[pg]?`<h2 class="pt">${TT[pg]}</h2>`:"")+T[pg]();
  $("#nv").innerHTML=tabs.map(t=>`<button class="${tab==t[0]?"on":""}" onclick="go('${t[0]}')"><span>${t[1]}</span>${t[2]}</button>`).join("");
- const bk=pg=="home"?`<button class="ib2" onclick="go('profil')">${IC.user}</button>`:pg=="profil"?`<button class="ib2" onclick="go('home')">${IC.back}</button>`:pg=="kategori"?`<button class="ib2" onclick="go('profil')">${IC.back}</button>`:"";
- $("#hd").innerHTML=`<div>${bk}</div><div class="ht">Finance Calculator</div><div></div>`};
+ const bk=pg=="home"?`<button class="ib2" onclick="go('profil')">${P.p?av(P.n,P.p):IC.user}</button>`:pg=="profil"?`<button class="ib2" onclick="go('home')">${IC.back}</button>`:pg=="kategori"?`<button class="ib2" onclick="go('profil')">${IC.back}</button>`:"";
+ $("#hd").innerHTML=`<div>${bk}</div><div style="min-width:0"><div class="ht">JejakDana</div>${LID?`<div class="hs">${esc(S.name)}</div>`:""}</div><div></div>`};
 Object.assign(window,{F,FT,fdef,S:new Proxy({},{get:(_,k)=>S[k]}),$});
 Object.defineProperty(window,"tab",{get:()=>tab,set:v=>tab=v});
 Object.defineProperty(window,"fb",{get:()=>fb});
