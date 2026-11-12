@@ -380,7 +380,7 @@ window.setTheme=v=>{try{localStorage.setItem("mmTheme",v)}catch(e){}applyTheme()
 // ---------- Render ----------
 const tabs=[["home",IC.home,"Home"],["transaksi",IC.tx,"Transaksi"],["penyimpanan",IC.wallet,"Dompet"],["tagihan",IC.cal,"Tagihan"]];
 const TT={transaksi:"Transaksi",penyimpanan:"Dompet",tagihan:"Tagihan",kategori:"Kategori"};
-window.go=t=>{tab=t;r();scrollTo(0,0)};
+window.go=t=>{if(t!=tab)history.pushState({tab:t},"");tab=t;r();scrollTo(0,0)};
 window.r=()=>{const gate=FB.apiKey&&(!user||!user.emailVerified);
  if(gate){document.body.classList.add("nonav");$("#nv").style.display="none";$("#hd").innerHTML=`<div></div><div class="ht">JejakDana</div><div></div>`;$("#mn").innerHTML=authUI();return}
  document.body.classList.remove("nonav");$("#nv").style.display="";const lock=FB.apiKey&&!LID&&tab!="profil",pg=lock?"profil":tab;
@@ -395,5 +395,15 @@ Object.defineProperty(window,"fb",{get:()=>fb});
 addEventListener("keydown",e=>{if(document.querySelector(".dl"))return;if(document.querySelector(".pp")){if(e.key=="Escape")closeP();else if(e.key=="Enter"){const b=document.querySelector(".pp [data-ok]");if(b&&e.target.tagName!="BUTTON"){e.preventDefault();b.click()}}return}
  if(!M)return;if(e.key=="Escape")closeM();else if(e.key=="Enter"&&e.target.tagName=="INPUT"&&e.target.type!="file")saveTx()});
 if("serviceWorker"in navigator&&/^https?:$/.test(location.protocol))addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+// ---------- Tombol back (Android swipe back / iOS) ----------
+let lyr=false,ign=0;
+const lyrOpen=()=>!!(PP||M||document.querySelector(".dl")||$("#md").innerHTML.trim());
+const settle=()=>{const o=lyrOpen();if(o&&!lyr){history.pushState({layer:1},"");lyr=true}else if(!o&&lyr){lyr=false;ign++;history.back()}};
+let st=0;const sched=()=>{clearTimeout(st);st=setTimeout(settle,40)};
+new MutationObserver(sched).observe(document.body,{childList:true});new MutationObserver(sched).observe($("#md"),{childList:true});
+history.replaceState({tab:"home"},"");
+addEventListener("popstate",e=>{if(ign>0){ign--;return}
+ if(lyr){lyr=false;document.querySelectorAll(".dl [data-x]").forEach(b=>b.click());PP=null;drawP();$("#md").innerHTML="";M=null;return}
+ tab=(e.state&&e.state.tab)||"home";r();scrollTo(0,0)});
 applyTheme();r();initFB().catch(e=>console.error(e));
 </script></body></html>
