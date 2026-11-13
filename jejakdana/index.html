@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="id"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1d4ed8"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" type="image/png" href="icon-192.png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="JejakDana"><meta name="apple-mobile-web-app-status-bar-style" content="default"><title>JejakDana</title><script>try{var v=localStorage.getItem("mmTheme")||"light";if(v!="auto")document.documentElement.setAttribute("data-theme",v)}catch(e){}</script>
+<meta name="theme-color" content="#1d4ed8"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" type="image/png" href="icon-192.png?v=2"><link rel="apple-touch-icon" href="apple-touch-icon.png?v=2"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="JejakDana"><meta name="apple-mobile-web-app-status-bar-style" content="default"><title>JejakDana</title><script>try{var v=localStorage.getItem("mmTheme")||"light";if(v!="auto")document.documentElement.setAttribute("data-theme",v)}catch(e){}</script>
 <style>
 :root{--bg:#f3f6fc;--cd:#fff;--tx:#0b1b3a;--mu:#6b7a99;--pr:#1d4ed8;--pr2:#3b82f6;--soft:#eaf1ff;--in:#059669;--ou:#dc2626;--bd:#e2e9f5;--sh:0 6px 20px rgba(29,78,216,.08);--tfc:#2563eb;--am:#b45309;--vi:#6d28d9;--hb:rgba(255,255,255,.75)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0a1020;--cd:#121a2e;--tx:#e8eefc;--mu:#93a1c4;--soft:#1a2644;--bd:#232f4d;--in:#34d399;--ou:#f87171;--sh:0 6px 20px rgba(0,0,0,.3);--tfc:#60a5fa;--am:#fbbf24;--vi:#a78bfa;--hb:rgba(10,16,32,.75)}}
@@ -98,6 +98,7 @@ header{background:var(--hb);-webkit-backdrop-filter:blur(16px);backdrop-filter:b
 /* bawah tab bawah: gradasi opacity konten */
 body::after{content:"";position:fixed;left:0;right:0;bottom:0;height:calc(140px + env(safe-area-inset-bottom,0px));pointer-events:none;z-index:4;background:linear-gradient(to top,var(--bg) 0,color-mix(in srgb,var(--bg) 94%,transparent) 22%,color-mix(in srgb,var(--bg) 72%,transparent) 46%,color-mix(in srgb,var(--bg) 38%,transparent) 70%,color-mix(in srgb,var(--bg) 12%,transparent) 88%,transparent 100%)}
 body.nonav::after{display:none}
+.spin{width:26px;height:26px;border:3px solid var(--soft);border-top-color:var(--pr2);border-radius:50%;animation:sp .8s linear infinite;margin-top:26px}@keyframes sp{to{transform:rotate(360deg)}}
 /* logo */
 .lgo{display:block;height:24px;width:auto;max-width:100%;margin:0 auto}.lgb{height:auto;width:min(240px,72%)}.brand{margin-bottom:22px}
 :root[data-theme="dark"] .lgo{filter:brightness(1.9) saturate(.85)}
@@ -148,7 +149,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const emptyG=()=>({name:"",owner:"",members:[],prof:{},st:[],exp:[],inc:[],bills:[],tx:[]});
 let S=FB.apiKey?emptyG():{...emptyG(),...JSON.parse(localStorage.getItem("mm")||"{}")},GL=[],ld=false,P=JSON.parse(localStorage.getItem("mmP")||"null")||{n:"",p:""};
 let LID=null,tab="home",F={p:"month",c:"all",a:today(),z:today()},M=null,fb=null,user=null,dip=null;
-let B=null,unsub=null;
+let B=null,unsub=null,boot=!!FB.apiKey;
 const AK=["st","exp","inc","bills","tx"],cl=o=>JSON.parse(JSON.stringify(o));
 const snapB=()=>{B={};AK.forEach(k=>B[k]=cl(S[k]||[]))};
 function delta(){const d={};AK.forEach(k=>{const b=new Map(B[k].map(x=>[x.id,JSON.stringify(x)])),cur=new Set(S[k].map(x=>x.id));
@@ -168,7 +169,7 @@ async function initFB(){if(!FB.apiKey)return;
  const v="10.14.1",b=`https://www.gstatic.com/firebasejs/${v}/`;
  const [A,Au,Fs]=await Promise.all([import(b+"firebase-app.js"),import(b+"firebase-auth.js"),import(b+"firebase-firestore.js")]);
  const app=A.initializeApp(FB),auth=Au.getAuth(app);fb={...Au,...Fs,auth,db:Fs.getFirestore(app)};
- fb.onAuthStateChanged(auth,async u=>{unsub&&unsub();unsub=null;user=u;LID=null;S=emptyG();GL=[];if(u&&u.emailVerified){ld=true;r();await loadAll(u)}r()})}
+ fb.onAuthStateChanged(auth,async u=>{unsub&&unsub();unsub=null;user=u;LID=null;S=emptyG();GL=[];if(u&&u.emailVerified){tab="home";ld=true;r();await loadAll(u)}boot=false;r()})}
 async function loadAll(u){ld=true;LID=null;S=emptyG();GL=[];try{const e=u.email.toLowerCase();
  const pd=await fb.getDoc(fb.doc(fb.db,"users",u.uid));P=pd.exists()?{n:pd.data().n||"",p:pd.data().p||""}:{n:"",p:""};
  if(!P.n){P.n=u.displayName||e.split("@")[0];try{await fb.setDoc(fb.doc(fb.db,"users",u.uid),P)}catch(_){}}
@@ -341,22 +342,20 @@ window.startTx=t=>{closeP(1);M={id:null,type:t,amt:"",st:"",to:"",cat:"",sub:"",
 window.editTx=id=>{M={...S.tx.find(t=>t.id==id)};if(!S.st.find(x=>x.id==M.st))M.st="";if(M.type=="tf"){if(!S.st.find(x=>x.id==M.to))M.to=""}else if(!fc(M.cat)){M.cat="";M.sub=""}form()};
 window.delTx=id=>dlg("Hapus transaksi?",[{t:"msg",v:"Transaksi ini akan dihapus."}],()=>{S.tx=S.tx.filter(t=>t.id!=id);save();r()},"Hapus");
 window.m=(k,v)=>{M[k]=v};
-function form(){const ty=M.type,c=[...S.exp,...S.inc].find(x=>x.id==M.cat),sc=(lb,val,ico,fn)=>`<button class="card wc sm pk" onclick="${fn}"><div class="ic ${ty}">${ico}</div><div><div class="mu">${lb}</div><b class="nm">${val||"Pilih"}</b></div></button>`,wi=id=>sv(WI[(S.st.find(x=>x.id==id)||{}).ic||"wallet"]),
- sbr=ty!="tf"&&c?`<button class="card pk sbr" onclick="pickS()"><div class="sbi">${IC.tag}</div><div class="fl"><div class="mu">Sub kategori (opsional)</div><b>${M.sub?esc(M.sub):"Pilih sub kategori"}</b></div>${IC.chev}</button>`:"";
+function form(){const ty=M.type,c=[...S.exp,...S.inc].find(x=>x.id==M.cat),sc=(lb,val,ico,fn)=>`<button class="card wc sm pk" onclick="${fn}"><div class="ic ${ty}">${ico}</div><div><div class="mu">${lb}</div><b class="nm">${val||"Pilih"}</b></div></button>`,wi=id=>sv(WI[(S.st.find(x=>x.id==id)||{}).ic||"wallet"]);
  $("#md").innerHTML=`<div class="ov"><div class="md"><div class="row"><b>${M.id?"Edit":"Catat"} ${{in:"pemasukan",out:"pengeluaran",tf:"transfer"}[ty]}</b><button class="i" onclick="closeM()">✕</button></div>
  <div class="g2" style="margin-top:10px"><button class="b s" onclick="voice()">Voice</button><button class="b s" onclick="$('#fl').click()">Foto struk</button></div>
  <input id="fl" type="file" accept="image/*" capture="environment" hidden onchange="scan(this.files[0])"><div id="ns" class="mu"></div>
  <input type="number" inputmode="numeric" placeholder="Nominal" value="${M.amt}" oninput="m('amt',+this.value)">
- <div class="wg" style="margin:6px 0">${sc(ty=="tf"?"Dari dompet":"Dompet",M.st&&sn(M.st),wi(M.st),"pickW('st')")}${ty=="tf"?sc("Ke dompet",M.to&&sn(M.to),wi(M.to),"pickW('to')"):sc("Kategori",c?esc(c.name)+(M.sub?" › "+esc(M.sub):""):"",c?esc(c.name[0]).toUpperCase():"?","pickC()")}</div>${sbr}
+ <div class="wg" style="margin:6px 0">${sc(ty=="tf"?"Dari dompet":"Dompet",M.st&&sn(M.st),wi(M.st),"pickW('st')")}${ty=="tf"?sc("Ke dompet",M.to&&sn(M.to),wi(M.to),"pickW('to')"):sc("Kategori",c?esc(c.name)+(M.sub?" › "+esc(M.sub):""):"",c?esc(c.name[0]).toUpperCase():"?","pickC()")}</div>
  <input placeholder="Keterangan / untuk apa" value="${esc(M.note)}" oninput="m('note',this.value)">
  <button class="b" onclick="saveTx()">Simpan</button></div></div>`}
 window.closeM=()=>{$("#md").innerHTML="";M=null;closeP(1)};
 window.pickW=w=>pop(()=>hd(w=="to"?"Ke dompet":"Pilih dompet")+`<div class="wg">${S.st.map(s=>`<button class="card wc pk ${M[w]==s.id?"on":""}" onclick="setW('${w}','${s.id}')"><div class="ic tf">${sv(WI[s.ic||"wallet"])}</div><div><b class="nm">${esc(s.name)}</b><div class="mu">${rp(bal(s.id))}</div></div></button>`).join("")}<button class="card wc add" onclick="addW('${w}')">+ Dompet</button></div>`);
 window.setW=(w,id)=>{M[w]=id;closeP(1);form()};window.addW=w=>add("st",null,id=>setW(w,id));
 window.pickC=()=>pop(()=>{const k=M.type=="in"?"inc":"exp";return hd("Pilih kategori")+`<div class="wg">${S[k].map(c=>`<button class="card wc pk ${M.cat==c.id?"on":""}" onclick="setC('${c.id}')"><div class="ic ${M.type}">${esc(c.name[0]||"?").toUpperCase()}</div><div><b class="nm">${esc(c.name)}</b>${c.subs?.length?`<div class="mu">${c.subs.length} sub kategori</div>`:""}</div></button>`).join("")}<button class="card wc add" onclick="addC()">+ Kategori</button></div>`});
-window.setC=id=>{M.cat=id;M.sub="";const c=fc(id);if(c&&c.subs?.length&&M.type!="tf")pop(()=>subP(c));else{closeP(1);form()}};
+window.setC=id=>{if(M.cat!=id)M.sub="";M.cat=id;const c=fc(id);if(c&&c.subs?.length&&M.type!="tf")pop(()=>subP(c));else{closeP(1);form()}};
 const subP=c=>hd("Pilih sub kategori")+`<div class="pcat"><span class="mu">Kategori</span><span class="mc k ${M.type}">${esc(c.name)}</span></div>`+(c.subs?.length?c.subs.map((x,i)=>`<button class="sr ${M.sub==x?"on":""}" onclick="setS(${i})"><span class="sdot"></span><span class="sn">${esc(x)}</span>${M.sub==x?'<span class="ck2">✓</span>':""}</button>`).join(""):`<p class="mu">Belum ada sub kategori untuk ${esc(c.name)}.</p>`)+`<button class="sr none ${!M.sub?"on":""}" onclick="setS(-1)"><span class="sdot"></span><span class="sn">Tanpa sub kategori</span>${!M.sub?'<span class="ck2">✓</span>':""}</button><button class="sr add" onclick="addS()">+ Tambah sub kategori</button>`;
-window.pickS=()=>{const c=fc(M.cat);if(c)pop(()=>subP(c))};
 window.setS=i=>{const c=fc(M.cat);M.sub=i<0?"":c.subs[i];closeP(1);form()};
 window.addC=()=>add(M.type=="in"?"inc":"exp",null,id=>{M.cat=id;M.sub="";closeP(1);form()});
 window.addS=()=>add("subs",M.cat,n=>{M.sub=n;closeP(1);form()});
@@ -424,7 +423,9 @@ window.setTheme=v=>{try{localStorage.setItem("mmTheme",v)}catch(e){}applyTheme()
 const tabs=[["home",IC.home,"Home"],["transaksi",IC.tx,"Transaksi"],["penyimpanan",IC.wallet,"Dompet"],["tagihan",IC.cal,"Tagihan"]];
 const TT={transaksi:"Transaksi",penyimpanan:"Dompet",tagihan:"Tagihan",kategori:"Kategori"};
 window.go=t=>{tab=t;r();scrollTo(0,0)};
-window.r=()=>{const gate=FB.apiKey&&(!user||!user.emailVerified);
+window.r=()=>{const splash=boot||(FB.apiKey&&user&&user.emailVerified&&ld&&!LID);$("#hd").style.display=splash?"none":"";
+ if(splash){document.body.classList.add("nonav");$("#nv").style.display="none";$("#mn").innerHTML=`<div class="au" style="align-items:center">${LOGO("lgb")}<div class="spin"></div></div>`;return}
+ const gate=FB.apiKey&&(!user||!user.emailVerified);
  if(gate){document.body.classList.add("nonav");$("#nv").style.display="none";$("#hd").innerHTML=`<div></div><div class="ht">${LOGO()}</div><div></div>`;$("#mn").innerHTML=authUI();return}
  document.body.classList.remove("nonav");$("#nv").style.display="";const lock=FB.apiKey&&!LID&&tab!="profil",pg=lock?"profil":tab;
  $("#mn").innerHTML=(TT[pg]?`<h2 class="pt">${TT[pg]}</h2>`:"")+T[pg]();
@@ -457,5 +458,5 @@ history.replaceState({b:1},"");history.pushState({g:1},"");
 addEventListener("popstate",()=>{if(ign>0){ign--;return}
  if(HD>0){HD--;if(!closeTop()&&tab!="home"){tab=tab=="kategori"?"profil":"home";r();scrollTo(0,0)}sched();return}
  atBase=true;toast("Geser kembali sekali lagi untuk keluar");clearTimeout(tmB);tmB=setTimeout(()=>{if(atBase){atBase=false;history.pushState({g:1},"")}},2200)});
-applyTheme();r();initFB().catch(e=>console.error(e));
+applyTheme();r();initFB().catch(e=>{console.error(e);boot=false;r()});
 </script></body></html>

@@ -1,4 +1,4 @@
-const V="jejakdana-v2",ASSETS=["./","index.html","manifest.webmanifest","icon-192.png","icon-512.png","logo.png"];
+const V="jejakdana-v3",ASSETS=["./","index.html","manifest.webmanifest","icon-192.png?v=2","icon-512.png?v=2","logo.png"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()))});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!=V).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});
 self.addEventListener("fetch",e=>{const r=e.request,u=new URL(r.url);
