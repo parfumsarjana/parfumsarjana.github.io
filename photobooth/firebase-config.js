@@ -8,5 +8,3 @@ export const firebaseConfig = {
   measurementId: "G-EYWQV1521L"
 };
 
-// Nama room kamera. Harus sama untuk iPhone dan tablet.
-export const ROOM_ID = "booth1";

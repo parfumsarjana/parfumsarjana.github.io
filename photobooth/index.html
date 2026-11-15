@@ -34,6 +34,7 @@ label input{width:140px}
   <h1>Photobooth</h1>
   <button id="start">Mulai</button>
   <button id="gear" class="s">Pengaturan</button>
+  <div id="who" style="position:absolute;left:16px;bottom:22px;font-size:14px;opacity:.6"></div>
 </section>
 
 <section id="pay">
@@ -65,7 +66,7 @@ label input{width:140px}
 </section>
 
 <section id="login">
-  <h2>Login admin</h2>
+  <h2>Login akun</h2>
   <input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Kata sandi">
   <div class="row"><button id="doLogin">Masuk</button><button class="s" data-home>Batal</button></div>
 </section>
@@ -83,7 +84,7 @@ label input{width:140px}
   </div>
   <div id="t_hint" style="max-width:420px"></div>
   <button id="addtpl" disabled>Tambah template</button>
-  <button class="s" id="out">Keluar admin</button>
+  <div class="row"><button class="s" id="close">Tutup</button><button class="s" id="out">Keluar akun</button></div>
 </section>
 
 <section id="dl">
@@ -96,7 +97,7 @@ label input{width:140px}
 import { app, db, roomRef, candCol, rtcConfig } from "./common.js";
 import { getFirestore, doc, collection, onSnapshot, setDoc, getDoc, addDoc, deleteDoc, updateDoc, query, where, getDocs }
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js";
 
 const $ = id => document.getElementById(id);
@@ -111,15 +112,23 @@ function timer(sec, end) {
 function home() { clearInterval(S.tm); S.unsub?.(); $("timer").textContent = ""; S.photos = []; show("home"); }
 document.querySelectorAll("[data-home]").forEach(b => b.onclick = home);
 
-// ---------- pengaturan & template (publik, dibaca semua) ----------
-onSnapshot(doc(db, "settings", "main"), s => { S.cfg = { ...S.cfg, ...(s.data() || {}) }; });
-onSnapshot(collection(db, "templates"), snap => {
-  S.tpls = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  if ($("admin").classList.contains("on")) listTpls();
+// ---------- data per akun: pengaturan & template milik pemilik yang login ----------
+const DEF = { ...S.cfg };
+let unsubData = [], unsubRoom = null;
+onAuthStateChanged(auth, u => {
+  unsubData.forEach(f => f()); unsubData = []; unsubRoom?.(); unsubRoom = null; pc?.close(); handled = null;
+  S.uid = u ? u.uid : null; S.cfg = { ...DEF }; S.tpls = []; $("who").textContent = u ? u.email : "";
+  if (!u) return;
+  unsubData.push(onSnapshot(doc(db, "owners", u.uid), s => { S.cfg = { ...DEF, ...(s.data() || {}) }; }));
+  unsubData.push(onSnapshot(collection(db, "owners", u.uid, "templates"), snap => {
+    S.tpls = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if ($("admin").classList.contains("on")) listTpls();
+  }));
+  if (!dId) bootCamera();
 });
 
 // ---------- 1. pembayaran QRIS dinamis ----------
-$("start").onclick = pay;
+$("start").onclick = () => auth.currentUser ? pay() : show("login");
 async function pay() {
   if (S.cfg.bypass) return pick();
   show("pay"); timer(S.cfg.tPay, home);
@@ -184,7 +193,7 @@ async function compose() {
     x.drawImage(await load(t.url), 0, 0, t.w, t.h); // bingkai di atas foto
     const url = fit(c, 900000); $("result").src = url;
     const id = crypto.randomUUID().slice(0, 12);
-    await setDoc(doc(db, "results", id), { img: url, created: Date.now() });
+    await setDoc(doc(db, "results", id), { img: url, created: Date.now(), owner: S.uid });
     new QRCode($("qrbox"), { text: location.origin + location.pathname + "?d=" + id, width: 220, height: 220 });
   } catch (e) { alert("Gagal menyimpan hasil: " + e.message); }
 }
@@ -198,7 +207,7 @@ if (dId) {
     const url = s.data().img; $("dlimg").src = url; $("dlbtn").hidden = false;
     $("dlbtn").onclick = () => { const a = document.createElement("a"); a.href = url; a.download = "photobooth.jpg"; a.click(); };
   });
-} else bootCamera();
+}
 
 // ---------- kamera iPhone via WebRTC (dari prototipe) ----------
 let pc = null, unsubCand = null, handled = null;
@@ -207,32 +216,37 @@ async function cleanup() {
 }
 function bootCamera() {
   cleanup();
-  setDoc(roomRef, { want: Date.now() }, { merge: true });
-  onSnapshot(roomRef, snap => { const d = snap.data(); if (d?.offer && d.session && d.session !== handled) answer(d); });
+  setDoc(roomRef(S.uid), { want: Date.now() }, { merge: true });
+  unsubRoom = onSnapshot(roomRef(S.uid), snap => { const d = snap.data(); if (d?.offer && d.session && d.session !== handled) answer(d); });
 }
 async function answer(d) {
   const session = handled = d.session; unsubCand?.(); pc?.close();
   const peer = pc = new RTCPeerConnection(rtcConfig);
   peer.ontrack = e => { $("v").srcObject = e.streams[0]; $("v").play().catch(() => {}); };
-  peer.onicecandidate = e => { if (e.candidate) addDoc(candCol, { from: "booth", session, candidate: e.candidate.toJSON() }); };
+  peer.onicecandidate = e => { if (e.candidate) addDoc(candCol(S.uid), { from: "booth", session, candidate: e.candidate.toJSON() }); };
   await peer.setRemoteDescription(d.offer); if (pc !== peer) return;
-  unsubCand = onSnapshot(query(candCol, where("session", "==", session)), snap => snap.docChanges().forEach(ch => {
+  unsubCand = onSnapshot(query(candCol(S.uid), where("session", "==", session)), snap => snap.docChanges().forEach(ch => {
     const c = ch.doc.data(); if (ch.type === "added" && c.from === "camera") peer.addIceCandidate(c.candidate).catch(() => {});
   }));
   const a = await peer.createAnswer(); await peer.setLocalDescription(a); if (pc !== peer) return;
-  await updateDoc(roomRef, { answer: { type: a.type, sdp: a.sdp }, answerSession: session });
+  await updateDoc(roomRef(S.uid), { answer: { type: a.type, sdp: a.sdp }, answerSession: session });
 }
 
 // ---------- admin ----------
-$("gear").onclick = () => auth.currentUser ? adminOpen() : show("login");
+$("gear").onclick = () => {
+  if (!auth.currentUser) return show("login");
+  const pin = String(S.cfg.pin || "");
+  if (pin) { const x = prompt("PIN pengaturan:"); if (x === null) return; if (x !== pin) return alert("PIN salah"); }
+  adminOpen();
+};
 $("doLogin").onclick = async () => {
-  try { await signInWithEmailAndPassword(auth, $("em").value, $("pw").value); adminOpen(); }
+  try { await signInWithEmailAndPassword(auth, $("em").value, $("pw").value); home(); }
   catch (e) { alert("Login gagal: " + e.message); }
 };
 const L = { price: "Harga (Rp)", tPay: "Waktu bayar (dtk)", tTpl: "Waktu pilih template (dtk)", tPhoto: "Waktu sesi foto (dtk)", cd: "Hitung mundur foto (dtk)", tReview: "Waktu review (dtk)" };
 $("fields").innerHTML = Object.entries(L).map(([k, t]) => `<label>${t}<input id="f_${k}" type="number"></label>`).join("")
   + `<label>Lewati pembayaran (mode uji)<input id="f_bypass" type="checkbox"></label>`
-  + `<label>Mode pembayaran<select id="f_payMode" style="width:140px"><option value="manual">Manual</option><option value="auto">Otomatis</option></select></label>`
+  + `<label>Mode pembayaran<select id="f_payMode" style="width:140px"><option value="manual">Manual</option></select></label>`
   + `<label>PIN operator<input id="f_pin" type="text"></label>`
   + `<label>Gambar QRIS<input id="f_qris" type="file" accept="image/*"></label>`;
 function adminOpen() {
@@ -247,7 +261,7 @@ $("save").onclick = async () => {
   const c = { bypass: $("f_bypass").checked, payMode: $("f_payMode").value, pin: $("f_pin").value }; Object.keys(L).forEach(k => c[k] = +$("f_" + k).value);
   try {
     const q = $("f_qris").files[0]; if (q) c.qrisImg = await shrink(q, 700);
-    await setDoc(doc(db, "settings", "main"), c, { merge: true }); alert("Tersimpan");
+    await setDoc(doc(db, "owners", S.uid), c, { merge: true }); alert("Tersimpan");
   } catch (e) { alert(e.message); }
 };
 function listTpls() {
@@ -256,7 +270,7 @@ function listTpls() {
     const r = document.createElement("div"); r.className = "row";
     r.append(Object.assign(document.createElement("span"), { textContent: `${t.name} (${t.w}x${t.h}, ${t.slots.length} foto)` }));
     const b = Object.assign(document.createElement("button"), { textContent: "Hapus", className: "s" });
-    b.onclick = () => confirm("Hapus " + t.name + "?") && deleteDoc(doc(db, "templates", t.id)); r.append(b); $("tlist").append(r);
+    b.onclick = () => confirm("Hapus " + t.name + "?") && deleteDoc(doc(db, "owners", S.uid, "templates", t.id)); r.append(b); $("tlist").append(r);
   });
 }
 let det = null;
@@ -320,13 +334,14 @@ $("addtpl").onclick = async () => {
     }
     if (url.length >= 1000000) throw new Error("Template terlalu besar/rumit. Perkecil atau sederhanakan gambarnya.");
     const slots = det.order.map(i => { const b = det.boxes[i]; return { x: Math.round(b.x * c.width / det.w), y: Math.round(b.y * c.height / det.h), w: Math.round(b.w * c.width / det.w), h: Math.round(b.h * c.height / det.h) }; });
-    await limit(addDoc(collection(db, "templates"), { name: $("t_name").value || "Template", url, w: c.width, h: c.height, slots }), 20000,
+    await limit(addDoc(collection(db, "owners", S.uid, "templates"), { name: $("t_name").value || "Template", url, w: c.width, h: c.height, slots }), 20000,
       "Gagal menyimpan. Cek rules Firestore dan dokumen admins/<UID>.");
     alert("Template ditambahkan"); $("t_file").value = ""; $("t_name").value = ""; $("t_prev").style.display = "none"; hint.textContent = ""; det = null;
   } catch (e) { hint.textContent = "Gagal: " + e.message; alert("Gagal: " + e.message); btn.disabled = false; }
   btn.textContent = "Tambah template"; if (det) btn.disabled = false;
 };
-$("out").onclick = async () => { await signOut(auth); home(); };
+$("close").onclick = home;
+$("out").onclick = async () => { if (confirm("Keluar dari akun ini di tablet?")) { await signOut(auth); home(); } };
 </script>
 </body>
 </html>

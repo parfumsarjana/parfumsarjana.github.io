@@ -21,17 +21,25 @@
       <option value="environment">Kamera belakang</option>
       <option value="user">Kamera depan</option>
     </select>
-    <button id="start">Mulai kamera</button>
+    <button id="start" disabled>Mulai kamera</button>
+  </div>
+  <div id="login" class="bar">
+    <input id="em" type="email" placeholder="Email" style="font-size:16px;padding:10px;border-radius:10px;border:0">
+    <input id="pw" type="password" placeholder="Kata sandi" style="font-size:16px;padding:10px;border-radius:10px;border:0">
+    <button id="doLogin">Masuk</button>
   </div>
   <div id="status">Belum dimulai.</div>
 
   <script type="module">
-    import { roomRef, candCol, rtcConfig } from "./common.js";
+    import { app, roomRef, candCol, rtcConfig } from "./common.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged }
+      from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
     import { setDoc, onSnapshot, addDoc, query, where }
       from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
     const $ = id => document.getElementById(id);
     const setStatus = t => { $("status").textContent = t; };
+    const auth = getAuth(app);
 
     let stream = null, pc = null, session = null, unsubCand = null;
     let lastWant = null, answeredFor = null, queue = [];
@@ -69,7 +77,7 @@
 
       peer.onicecandidate = e => {
         if (e.candidate) {
-          addDoc(candCol, { from: "camera", session: mySession, candidate: e.candidate.toJSON() });
+          addDoc(candCol(auth.currentUser.uid), { from: "camera", session: mySession, candidate: e.candidate.toJSON() });
         }
       };
       peer.onconnectionstatechange = () => {
@@ -80,7 +88,7 @@
         }
       };
 
-      unsubCand = onSnapshot(query(candCol, where("session", "==", mySession)), snap => {
+      unsubCand = onSnapshot(query(candCol(auth.currentUser.uid), where("session", "==", mySession)), snap => {
         snap.docChanges().forEach(ch => {
           if (ch.type !== "added") return;
           const d = ch.doc.data();
@@ -92,7 +100,7 @@
 
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
-      await setDoc(roomRef, {
+      await setDoc(roomRef(auth.currentUser.uid), {
         offer: { type: offer.type, sdp: offer.sdp },
         session: mySession,
         answer: null,
@@ -101,7 +109,7 @@
     }
 
     // Satu listener untuk room: menerima answer dan permintaan sambung ulang dari tablet.
-    onSnapshot(roomRef, async snap => {
+    function listenRoom(uid) { return onSnapshot(roomRef(uid), async snap => {
       const d = snap.data();
       if (!d) return;
       if (lastWant === null) {
@@ -116,8 +124,18 @@
         await pc.setRemoteDescription(d.answer);
         queue.splice(0).forEach(c => pc.addIceCandidate(c).catch(() => {}));
       }
-    });
+    }); }
 
+    let roomUnsub = null;
+    onAuthStateChanged(auth, u => {
+      roomUnsub?.(); roomUnsub = null;
+      $("login").hidden = !!u; $("start").disabled = !u;
+      if (u) { roomUnsub = listenRoom(u.uid); setStatus("Login: " + u.email); }
+    });
+    $("doLogin").onclick = async () => {
+      try { await signInWithEmailAndPassword(auth, $("em").value, $("pw").value); }
+      catch (e) { setStatus("Login gagal: " + e.message); }
+    };
     $("start").addEventListener("click", startCamera);
     $("facing").addEventListener("change", () => { if (stream) startCamera(); });
   </script>
