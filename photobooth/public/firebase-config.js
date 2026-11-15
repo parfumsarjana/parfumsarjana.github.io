@@ -1,5 +1,4 @@
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyCi8rIvuWdMjJoGl1O5cAViwSYyCfmqHqw",
   authDomain: "photobooth-f076e.firebaseapp.com",
   projectId: "photobooth-f076e",
@@ -8,3 +7,5 @@ const firebaseConfig = {
   appId: "1:363823617082:web:2036028e198f1309049103",
   measurementId: "G-EYWQV1521L"
 };
+
+export const ROOM_ID = "booth1";
