@@ -1,13 +1,10 @@
-// Ganti dengan config web app dari Firebase Console:
-// Project settings → General → Your apps → Web app → SDK setup and configuration
-export const firebaseConfig = {
-  apiKey: "ISI_DI_SINI",
-  authDomain: "PROJECT_ID.firebaseapp.com",
-  projectId: "PROJECT_ID",
-  storageBucket: "PROJECT_ID.appspot.com",
-  messagingSenderId: "ISI_DI_SINI",
-  appId: "ISI_DI_SINI"
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCi8rIvuWdMjJoGl1O5cAViwSYyCfmqHqw",
+  authDomain: "photobooth-f076e.firebaseapp.com",
+  projectId: "photobooth-f076e",
+  storageBucket: "photobooth-f076e.firebasestorage.app",
+  messagingSenderId: "363823617082",
+  appId: "1:363823617082:web:2036028e198f1309049103",
+  measurementId: "G-EYWQV1521L"
 };
-
-// Nama room. iPhone dan tablet harus memakai nama yang sama.
-export const ROOM_ID = "booth1";
