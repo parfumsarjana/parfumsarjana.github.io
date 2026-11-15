@@ -27,7 +27,7 @@ input,textarea{font-size:16px;padding:8px;border-radius:8px;border:1px solid #55
 
 /* sesi foto: preview 4:3 besar */
 .vwrap{--ar:1.3333;position:relative;width:min(100%,calc((100vh - 235px) * var(--ar)));width:min(100%,calc((100dvh - 235px) * var(--ar)));aspect-ratio:var(--ar);background:#000;border-radius:16px;overflow:hidden;flex:none}
-#v{width:100%;height:100%;object-fit:contain;display:block;background:#000}
+#v{position:absolute;left:50%;top:50%;width:100%;height:100%;transform:translate(-50%,-50%);object-fit:contain;display:block;background:#000}
 #cd{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(90px,22vh,200px);font-weight:700;text-shadow:0 0 24px #000;pointer-events:none}
 #thumbs{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .slot{position:relative;width:96px;height:72px;border:2px dashed #555;border-radius:8px;overflow:hidden;cursor:pointer;flex:none}
@@ -106,7 +106,7 @@ label input{width:140px}
   <div class="vwrap"><video id="v" autoplay muted playsinline></video><div id="cd"></div></div>
   <div id="thumbs"></div>
   <div id="cnt" class="hint"></div>
-  <div class="row"><button id="snap">Ambil foto</button><button id="next" disabled>Lanjut</button></div>
+  <div class="row"><button class="s" id="rot">Putar kamera ⟳</button><button id="snap">Ambil foto</button><button id="next" disabled>Lanjut</button></div>
 </section>
 
 <section id="review">
@@ -246,13 +246,30 @@ const load = u => new Promise((r, j) => { const i = new Image(); i.crossOrigin =
 const maxPool = () => Math.min(12, S.tpl.slots.length * 2);
 // Ukuran mengikuti stream dari HP (landscape/portrait), sisi terpanjang dibatasi max, dibuat genap.
 function dims(w, h, max) { const k = Math.min(1, max / Math.max(w, h)); return [Math.round(w * k / 2) * 2, Math.round(h * k / 2) * 2]; }
-function syncAr() { const v = $("v"); if (v.videoWidth) document.querySelector(".vwrap").style.setProperty("--ar", v.videoWidth / v.videoHeight); }
+// Putaran kamera (0/90/180/270), diingat di tablet. Dipakai kalau iPhone mengirim gambar miring (mis. rotation lock aktif).
+// Default otomatis: kalau gambar dari iPhone vertikal, diputar 90° supaya preview landscape.
+let rot = 0, rotSaved = null; try { const s = localStorage.getItem("rot"); rotSaved = s === null ? null : +s; } catch {}
+const sw90 = () => rot % 180 !== 0;
+function syncAr() {
+  const v = $("v"), box = document.querySelector(".vwrap");
+  rot = rotSaved ?? (v.videoHeight > v.videoWidth ? 90 : 0);
+  if (v.videoWidth) box.style.setProperty("--ar", sw90() ? v.videoHeight / v.videoWidth : v.videoWidth / v.videoHeight);
+  if (sw90()) { v.style.width = box.clientHeight + "px"; v.style.height = box.clientWidth + "px"; } else { v.style.width = "100%"; v.style.height = "100%"; }
+  v.style.transform = `translate(-50%,-50%) rotate(${rot}deg)`;
+}
 $("v").addEventListener("loadedmetadata", syncAr); $("v").addEventListener("resize", syncAr);
+new ResizeObserver(syncAr).observe(document.querySelector(".vwrap"));
+$("rot").onclick = () => { rotSaved = (rot + 90) % 360; try { localStorage.setItem("rot", rotSaved); } catch {} syncAr(); };
+function paint(cv, max) { // gambar frame video ke canvas sesuai putaran
+  const v = $("v"), ew = sw90() ? v.videoHeight : v.videoWidth, eh = sw90() ? v.videoWidth : v.videoHeight;
+  [cv.width, cv.height] = dims(ew, eh, max);
+  const x = cv.getContext("2d"), dw = sw90() ? cv.height : cv.width, dh = sw90() ? cv.width : cv.height;
+  x.save(); x.translate(cv.width / 2, cv.height / 2); x.rotate(rot * Math.PI / 180); x.drawImage(v, -dw / 2, -dh / 2, dw, dh); x.restore();
+}
 const fc = document.createElement("canvas");
 function grabFrame() {
   const v = $("v"); if (!v.videoWidth || S.frames.length >= 300) return;
-  [fc.width, fc.height] = dims(v.videoWidth, v.videoHeight, 240);
-  fc.getContext("2d").drawImage(v, 0, 0, fc.width, fc.height);
+  paint(fc, 240);
   S.frames.push(fc.toDataURL("image/jpeg", .5).slice(23)); // buang "data:image/jpeg;base64,"
 }
 function shoot(t) {
@@ -286,9 +303,7 @@ $("snap").onclick = async () => {
   for (let n = S.cfg.cd; n > 0; n--) { $("cd").textContent = n; await new Promise(r => setTimeout(r, 1000)); }
   $("cd").textContent = "";
   if (!$("shoot").classList.contains("on")) return;
-  const v = $("v"), c = document.createElement("canvas");
-  [c.width, c.height] = dims(v.videoWidth, v.videoHeight, 1600);
-  c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+  const c = document.createElement("canvas"); paint(c, 1600);
   const th = document.createElement("canvas"); [th.width, th.height] = dims(c.width, c.height, 240); th.getContext("2d").drawImage(c, 0, 0, th.width, th.height);
   S.photos.push({ cv: c, url: th.toDataURL("image/jpeg", .7) }); drawSlots();
 };
