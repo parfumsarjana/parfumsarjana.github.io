@@ -78,8 +78,11 @@ label input{width:140px}
   <div id="tlist"></div>
   <input id="t_name" placeholder="Nama template">
   <input id="t_file" type="file" accept="image/png">
-  <textarea id="t_slots" rows="4" placeholder="Posisi foto, satu per baris: x,y,w,h (piksel pada gambar template)"></textarea>
-  <button id="addtpl">Tambah template</button>
+  <div id="t_prev" style="position:relative;width:min(300px,80vw);display:none">
+    <img id="t_img" style="width:100%;display:block;background:repeating-conic-gradient(#555 0 25%,#333 0 50%) 0 0/20px 20px" alt="">
+  </div>
+  <div id="t_hint" style="max-width:420px"></div>
+  <button id="addtpl" disabled>Tambah template</button>
   <button class="s" id="out">Keluar admin</button>
 </section>
 
@@ -244,15 +247,58 @@ function listTpls() {
     b.onclick = () => confirm("Hapus " + t.name + "?") && deleteDoc(doc(db, "templates", t.id)); r.append(b); $("tlist").append(r);
   });
 }
+let det = null;
+$("t_file").onchange = async () => {
+  const f = $("t_file").files[0]; det = null; $("addtpl").disabled = true;
+  if (!f) { $("t_prev").style.display = "none"; return; }
+  $("t_hint").textContent = "Mendeteksi area foto…";
+  const im = await createImageBitmap(f), W = im.width, H = im.height;
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const cx = c.getContext("2d", { willReadFrequently: true }); cx.drawImage(im, 0, 0);
+  const d = cx.getImageData(0, 0, W, H).data;
+  const k = Math.max(1, Math.ceil(W / 1000)), w = Math.floor(W / k), h = Math.floor(H / k);
+  const g = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) g[y * w + x] = d[((y * k) * W + x * k) * 4 + 3] <= 10 ? 1 : 0;
+  const boxes = [], st = [], m = k + 4;
+  for (let s0 = 0; s0 < w * h; s0++) {
+    if (g[s0] !== 1) continue;
+    let x0 = w, y0 = h, x1 = 0, y1 = 0, cnt = 0; g[s0] = 2; st.push(s0);
+    while (st.length) {
+      const p = st.pop(), x = p % w, y = (p / w) | 0; cnt++;
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+      if (x > 0 && g[p - 1] === 1) { g[p - 1] = 2; st.push(p - 1); }
+      if (x < w - 1 && g[p + 1] === 1) { g[p + 1] = 2; st.push(p + 1); }
+      if (y > 0 && g[p - w] === 1) { g[p - w] = 2; st.push(p - w); }
+      if (y < h - 1 && g[p + w] === 1) { g[p + w] = 2; st.push(p + w); }
+    }
+    if (cnt > w * h * 0.005) {
+      const x = Math.max(0, x0 * k - m), y = Math.max(0, y0 * k - m);
+      boxes.push({ x, y, w: Math.min(W, (x1 + 1) * k + m) - x, h: Math.min(H, (y1 + 1) * k + m) - y });
+    }
+  }
+  boxes.sort((a, b) => a.y - b.y || a.x - b.x);
+  if (!boxes.length) { $("t_prev").style.display = "none"; $("t_hint").textContent = "Tidak ada area transparan. Pastikan PNG punya lubang transparan di tempat foto."; return; }
+  det = { boxes, w: W, h: H, order: boxes.map((_, i) => i) };
+  $("t_img").src = URL.createObjectURL(f); $("t_prev").style.display = "block"; drawDet();
+};
+function drawDet() {
+  const p = $("t_prev"); p.querySelectorAll(".bx").forEach(e => e.remove());
+  det.boxes.forEach((b, i) => {
+    const e = document.createElement("div"), n = det.order.indexOf(i); e.className = "bx";
+    e.style.cssText = `position:absolute;left:${b.x / det.w * 100}%;top:${b.y / det.h * 100}%;width:${b.w / det.w * 100}%;height:${b.h / det.h * 100}%;border:3px solid #0f0;background:#0f03;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:700;cursor:pointer`;
+    e.textContent = n >= 0 ? n + 1 : "";
+    e.onclick = () => { det.order = det.order.length === det.boxes.length ? [i] : det.order.includes(i) ? det.order : [...det.order, i]; drawDet(); };
+    p.append(e);
+  });
+  const ok = det.order.length === det.boxes.length; $("addtpl").disabled = !ok;
+  $("t_hint").textContent = `${det.boxes.length} area foto terdeteksi. Angka = urutan foto. ` + (ok ? "Klik kotak untuk mengubah urutan." : "Lanjut klik kotak sesuai urutan.");
+}
 $("addtpl").onclick = async () => {
   try {
-    const f = $("t_file").files[0]; if (!f) return alert("Pilih gambar template (PNG, area foto transparan)");
-    const im = await createImageBitmap(f);
-    const slots = $("t_slots").value.trim().split("\n").map(l => { const [x, y, w, h] = l.split(",").map(Number); return { x, y, w, h }; });
-    if (slots.some(s => [s.x, s.y, s.w, s.h].some(isNaN))) return alert("Format posisi foto salah");
+    const f = $("t_file").files[0]; if (!f || !det) return;
     const rf = sref(storage, "templates/" + Date.now() + ".png"); await uploadBytes(rf, f);
-    await addDoc(collection(db, "templates"), { name: $("t_name").value || "Template", url: await getDownloadURL(rf), w: im.width, h: im.height, slots });
-    alert("Template ditambahkan");
+    await addDoc(collection(db, "templates"), { name: $("t_name").value || "Template", url: await getDownloadURL(rf), w: det.w, h: det.h, slots: det.order.map(i => det.boxes[i]) });
+    alert("Template ditambahkan"); $("t_file").value = ""; $("t_name").value = ""; $("t_prev").style.display = "none"; $("t_hint").textContent = ""; det = null; $("addtpl").disabled = true;
   } catch (e) { alert(e.message); }
 };
 $("out").onclick = async () => { await signOut(auth); home(); };
