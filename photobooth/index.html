@@ -6,33 +6,86 @@
 <title>Photobooth</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
-:root{color-scheme:dark}*{box-sizing:border-box}
-body{margin:0;height:100vh;font-family:system-ui,sans-serif;background:#111;color:#fff}
-section{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;text-align:center;visibility:hidden;overflow:auto}
+:root{color-scheme:dark;--bg:#0f1115;--card:#1b1e26;--line:#323746;--ac:#ffd24a}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;height:100vh;height:100dvh;font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:#fff}
+h1,h2,h3{margin:0}
+section{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 16px;text-align:center;visibility:hidden;overflow:auto}
+section>:first-child{margin-top:auto}section>:last-child{margin-bottom:auto}
 section.on{visibility:visible}
-button{font-size:20px;padding:14px 28px;border:0;border-radius:14px;background:#fff;color:#111}
-button.s{background:#333;color:#fff}button:disabled{opacity:.4}
+button{font:600 20px system-ui,sans-serif;padding:14px 28px;border:0;border-radius:14px;background:var(--ac);color:#111;cursor:pointer;touch-action:manipulation}
+button.s{background:#2b3040;color:#fff}button:disabled{opacity:.35}button:active{transform:scale(.97)}
+a.btn{display:inline-block;text-decoration:none;font:600 18px system-ui,sans-serif;padding:12px 22px;border-radius:12px;background:var(--ac);color:#111}
+a.btn.s{background:#2b3040;color:#fff}
 input,textarea{font-size:16px;padding:8px;border-radius:8px;border:1px solid #555;background:#222;color:#fff;width:100%;max-width:420px}
-#timer{position:fixed;top:12px;right:16px;font-size:24px;z-index:9}
+#timer{position:fixed;top:12px;right:16px;font-size:26px;font-weight:700;z-index:9;background:#0008;border-radius:10px;padding:0 10px}
+#timer:empty{display:none}
 #gear{position:absolute;right:16px;bottom:16px;font-size:16px;padding:10px 14px}
-#v{width:100%;max-height:58vh;object-fit:contain;background:#000;border-radius:12px}
-#cd{position:absolute;font-size:120px;font-weight:700;text-shadow:0 0 20px #000}
-.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-.slot{position:relative;width:90px;height:90px;border:2px dashed #555;border-radius:8px;overflow:hidden}
-.slot img{width:100%;height:100%;object-fit:cover}
-.slot b{position:absolute;top:2px;right:4px;background:#000a;padding:0 6px;border-radius:6px}
-#tpls img{height:50vh;max-width:45vw;object-fit:contain;border:2px solid #444;border-radius:10px;background:#222}
-#result,#dlimg{max-height:60vh;max-width:90vw}
+.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;width:100%;max-width:720px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.hint{opacity:.8;font-size:16px;max-width:520px}
+
+/* sesi foto: preview 4:3 besar */
+.vwrap{position:relative;width:min(100%,calc((100vh - 235px) * 4 / 3));width:min(100%,calc((100dvh - 235px) * 4 / 3));aspect-ratio:4/3;background:#000;border-radius:16px;overflow:hidden;flex:none}
+#v{width:100%;height:100%;object-fit:cover;display:block;background:#000}
+#cd{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(90px,22vh,200px);font-weight:700;text-shadow:0 0 24px #000;pointer-events:none}
+#thumbs{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.slot{position:relative;width:96px;height:72px;border:2px dashed #555;border-radius:8px;overflow:hidden;cursor:pointer;flex:none}
+.slot img{width:100%;height:100%;object-fit:cover;display:block}
+.slot b{position:absolute;top:2px;right:3px;background:#000b;min-width:24px;height:24px;border-radius:12px;font-size:14px;line-height:24px}
+.slot i{position:absolute;left:4px;bottom:2px;font-style:normal;font-weight:700;font-size:18px;text-shadow:0 0 4px #000}
+.slot:not(:has(img)){cursor:default}.slot:not(:has(img)) i{left:0;right:0;bottom:auto;top:50%;transform:translateY(-50%);font-size:28px;opacity:.35;text-shadow:none}
+
+#tpls{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+#tpls img{height:min(60vh,520px);max-width:44vw;object-fit:contain;border:2px solid #444;border-radius:10px;background:#222;cursor:pointer}
+
+/* review & selesai */
+.rv{display:grid;grid-template-columns:1fr 1fr;gap:22px;width:100%;max-width:1100px;align-items:center;justify-items:center}
+.rv>div{width:100%;display:flex;flex-direction:column;align-items:center;gap:12px}
+@media (max-width:760px),(max-aspect-ratio:1/1){.rv{grid-template-columns:1fr}#pv,#final{max-height:46vh!important}}
+#pv,#final{max-width:100%;max-height:72vh;width:auto;height:auto;border-radius:10px;background:#222;box-shadow:0 6px 30px #0008}
+#pv{cursor:pointer;touch-action:manipulation}
+#tray{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px;width:100%;max-height:40vh;overflow:auto;padding:2px}
+.tp{position:relative;aspect-ratio:4/3;border-radius:10px;overflow:hidden;border:3px solid transparent;cursor:pointer;background:#000}
+.tp img{width:100%;height:100%;object-fit:cover;display:block}
+.tp.pl{border-color:var(--ac)}.tp.pl img{opacity:.5}
+.tp i{position:absolute;left:4px;top:4px;min-width:28px;height:28px;border-radius:14px;background:var(--ac);color:#111;font-style:normal;font-weight:700;display:flex;align-items:center;justify-content:center}
+.tp button{position:absolute;right:4px;bottom:4px;font-size:16px;padding:4px 9px;border-radius:8px;background:#000b;color:#fff}
+
+#lb{position:fixed;inset:0;z-index:30;background:#000e;display:none;align-items:center;justify-content:center;padding:12px}
+#lb.on{display:flex}#lb img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
+#busy{position:fixed;inset:0;z-index:40;background:#000d;display:none;align-items:center;justify-content:center;font-size:26px}
+#busy.on{display:flex}
+
+/* halaman unduh */
+#dlimg{max-height:60vh;max-width:100%;border-radius:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;width:100%}
+.grid div{display:flex;flex-direction:column;gap:8px;align-items:center}
+.grid img{width:100%;border-radius:8px;aspect-ratio:4/3;object-fit:cover}
+#dlvid2{max-width:100%;border-radius:10px;background:#000}
+
 label{display:flex;gap:8px;align-items:center;justify-content:space-between;width:100%;max-width:420px}
 label input{width:140px}
+
+#prt{display:none}
+@media print{
+  @page{margin:0}
+  html,body{background:#fff!important;height:auto}
+  body>*{display:none!important}
+  body>#prt{display:flex!important;align-items:center;justify-content:center;width:100vw;height:100vh}
+  #prt img{max-width:100%;max-height:100vh;object-fit:contain}
+}
 </style>
 </head>
 <body>
 <div id="timer"></div>
+<div id="prt"><img id="prtimg" alt=""></div>
+<div id="lb"><img id="lbimg" alt=""></div>
+<div id="busy">Menyimpan hasil…</div>
 
 <section id="home" class="on">
-  <h1>Photobooth</h1>
-  <button id="start">Mulai</button>
+  <h1 style="font-size:56px">Photobooth</h1>
+  <button id="start" style="font-size:28px;padding:20px 60px">Mulai</button>
   <button id="gear" class="s">Pengaturan</button>
   <div id="who" style="position:absolute;left:16px;bottom:22px;font-size:14px;opacity:.6"></div>
 </section>
@@ -40,29 +93,48 @@ label input{width:140px}
 <section id="pay">
   <h2>Scan QRIS untuk membayar</h2>
   <img id="qr" width="280" height="280" alt="QRIS" style="background:#fff;border-radius:12px">
-  <div id="amt"></div>
+  <div id="amt" style="font-size:24px"></div>
   <div class="row"><button class="s" data-home>Batal</button><button id="opconf" class="s" style="font-size:14px">Konfirmasi (operator)</button></div>
 </section>
 
 <section id="pick">
   <h2>Pilih template</h2>
-  <div id="tpls" class="row"></div>
+  <div id="tpls"></div>
 </section>
 
 <section id="shoot">
-  <div style="position:relative;width:100%;display:flex;justify-content:center">
-    <video id="v" autoplay muted playsinline></video><div id="cd"></div>
-  </div>
-  <div id="thumbs" class="row"></div>
+  <div class="vwrap"><video id="v" autoplay muted playsinline></video><div id="cd"></div></div>
+  <div id="thumbs"></div>
+  <div id="cnt" class="hint"></div>
   <div class="row"><button id="snap">Ambil foto</button><button id="next" disabled>Lanjut</button></div>
 </section>
 
 <section id="review">
   <h2>Hasil foto</h2>
-  <img id="result" alt="Hasil">
-  <div>Scan untuk mengunduh</div>
-  <div id="qrbox" style="background:#fff;padding:8px;border-radius:8px"></div>
-  <button class="s" data-home>Selesai</button>
+  <div class="rv">
+    <div><canvas id="pv"></canvas></div>
+    <div>
+      <div class="hint" id="rvhint"></div>
+      <div id="tray"></div>
+      <div class="row">
+        <button class="s" id="reorder">Urutkan ulang</button>
+        <button class="s" id="again">Foto lagi</button>
+        <button id="save" disabled>Simpan &amp; lanjut</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="done">
+  <h2>Foto kamu siap!</h2>
+  <div class="rv">
+    <div><img id="final" alt="Hasil"></div>
+    <div>
+      <div>Scan untuk mengunduh foto, foto asli, dan video timelapse</div>
+      <div id="qrbox" style="background:#fff;padding:10px;border-radius:12px"></div>
+      <div class="row"><button id="print">Cetak</button><button class="s" data-home>Selesai</button></div>
+    </div>
+  </div>
 </section>
 
 <section id="login">
@@ -74,7 +146,7 @@ label input{width:140px}
 <section id="admin">
   <h2>Pengaturan</h2>
   <div id="fields"></div>
-  <button id="save">Simpan pengaturan</button>
+  <button id="save2">Simpan pengaturan</button>
   <h3>Template</h3>
   <div id="tlist"></div>
   <input id="t_name" placeholder="Nama template">
@@ -89,8 +161,21 @@ label input{width:140px}
 
 <section id="dl">
   <h2 id="dlmsg">Foto kamu</h2>
-  <img id="dlimg" alt="Foto">
-  <button id="dlbtn" hidden>Unduh gambar</button>
+  <div class="card">
+    <img id="dlimg" alt="Foto">
+    <a id="dlmain" class="btn" download="photobooth-template.jpg" hidden>Unduh foto template</a>
+  </div>
+  <div class="card" id="orgc" hidden>
+    <h3>Foto asli</h3>
+    <div id="orgs" class="grid"></div>
+  </div>
+  <div class="card" id="vidc" hidden>
+    <h3>Video timelapse</h3>
+    <video id="dlvid2" controls playsinline hidden></video>
+    <button id="mkvid">Buat video timelapse</button>
+    <a id="dlvid" class="btn" hidden>Unduh video</a>
+    <div id="vidst" class="hint"></div>
+  </div>
 </section>
 
 <script type="module">
@@ -102,15 +187,21 @@ import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/
 
 const $ = id => document.getElementById(id);
 const auth = getAuth(app), createQris = httpsCallable(getFunctions(app), "createQris");
-const S = { cfg: { price: 20000, tPay: 120, tTpl: 60, tPhoto: 180, cd: 3, tReview: 60, bypass: true, payMode: "manual", pin: "", qrisImg: "" }, tpls: [], tpl: null, photos: [], tm: null, unsub: null };
+const S = { cfg: { price: 20000, tPay: 120, tTpl: 60, tPhoto: 180, cd: 3, tReview: 90, tDone: 90, bypass: true, payMode: "manual", pin: "", qrisImg: "" },
+  tpls: [], tpl: null, tplP: null, photos: [], place: [], frames: [], tm: null, fiv: null, unsub: null };
 const show = id => document.querySelectorAll("section").forEach(s => s.classList.toggle("on", s.id === id));
 function timer(sec, end) {
   clearInterval(S.tm); let n = sec;
   const f = () => { $("timer").textContent = n > 0 ? n : ""; if (n-- <= 0) { clearInterval(S.tm); end(); } };
   f(); S.tm = setInterval(f, 1000);
 }
-function home() { clearInterval(S.tm); S.unsub?.(); $("timer").textContent = ""; S.photos = []; show("home"); }
+function home() {
+  clearInterval(S.tm); clearInterval(S.fiv); S.unsub?.(); $("timer").textContent = "";
+  S.photos = []; S.place = []; S.frames = []; $("busy").classList.remove("on"); show("home");
+}
 document.querySelectorAll("[data-home]").forEach(b => b.onclick = home);
+const zoom = src => { $("lbimg").src = src; $("lb").classList.add("on"); };
+$("lb").onclick = () => $("lb").classList.remove("on");
 
 // ---------- data per akun: pengaturan & template milik pemilik yang login ----------
 const DEF = { ...S.cfg };
@@ -150,69 +241,220 @@ function pick() {
   S.tpls.forEach(t => { const i = new Image(); i.src = t.url; i.alt = t.name; i.onclick = () => shoot(t); $("tpls").append(i); });
 }
 
-// ---------- 3. sesi foto ----------
+// ---------- 3. sesi foto (preview & hasil 4:3) ----------
+const load = u => new Promise((r, j) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => r(i); i.onerror = j; i.src = u; });
+const maxPool = () => Math.min(12, S.tpl.slots.length * 2);
+function crop43(v) {
+  const vw = v.videoWidth, vh = v.videoHeight; let sw = vw, sh = vh;
+  if (vw / vh > 4 / 3) sw = vh * 4 / 3; else sh = vw * 3 / 4;
+  return [(vw - sw) / 2, (vh - sh) / 2, sw, sh];
+}
+const fc = document.createElement("canvas"); fc.width = 240; fc.height = 180;
+function grabFrame() {
+  const v = $("v"); if (!v.videoWidth || S.frames.length >= 300) return;
+  const [sx, sy, sw, sh] = crop43(v);
+  fc.getContext("2d").drawImage(v, sx, sy, sw, sh, 0, 0, 240, 180);
+  S.frames.push(fc.toDataURL("image/jpeg", .5).slice(23)); // buang "data:image/jpeg;base64,"
+}
 function shoot(t) {
-  S.tpl = t; S.photos = new Array(t.slots.length).fill(null);
+  S.tpl = t; S.photos = []; S.place = []; S.frames = [];
+  S.tplP = load(t.url); S.tplP.catch(() => {});
   show("shoot"); drawSlots();
-  timer(S.cfg.tPhoto, () => S.photos.every(Boolean) ? compose() : home());
+  clearInterval(S.fiv); S.fiv = setInterval(grabFrame, 1000);
+  timer(S.cfg.tPhoto, () => S.photos.length >= t.slots.length ? review() : home());
 }
 function drawSlots() {
   const el = $("thumbs"); el.innerHTML = "";
-  S.photos.forEach((p, i) => {
-    const d = document.createElement("div"); d.className = "slot";
-    if (p) { const im = new Image(); im.src = p.url; const x = document.createElement("b"); x.textContent = "✕";
-      x.onclick = () => { S.photos[i] = null; drawSlots(); }; d.append(im, x); }
+  const n = Math.max(S.photos.length, S.tpl.slots.length);
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement("div"), p = S.photos[i]; d.className = "slot";
+    if (p) {
+      const im = new Image(); im.src = p.url; d.onclick = () => zoom(p.cv.toDataURL("image/jpeg", .9));
+      const x = document.createElement("b"); x.textContent = "✕";
+      x.onclick = e => { e.stopPropagation(); S.photos.splice(i, 1); drawSlots(); };
+      d.append(im, x);
+    }
+    const num = document.createElement("i"); num.textContent = i + 1; d.append(num);
     el.append(d);
-  });
-  const full = S.photos.every(Boolean); $("snap").disabled = full; $("next").disabled = !full;
+  }
+  const need = S.tpl.slots.length;
+  $("cnt").textContent = `Foto ${S.photos.length} dari ${need}` + (maxPool() > need ? ` · boleh ambil sampai ${maxPool()} foto, pilih yang terbaik nanti` : "") + ". Klik foto untuk memperbesar.";
+  $("snap").disabled = S.photos.length >= maxPool(); $("next").disabled = S.photos.length < need;
 }
 $("snap").onclick = async () => {
-  const i = S.photos.indexOf(null); if (i < 0) return;
+  if (!$("v").videoWidth) return alert("Kamera belum tersambung.");
   $("snap").disabled = true;
   for (let n = S.cfg.cd; n > 0; n--) { $("cd").textContent = n; await new Promise(r => setTimeout(r, 1000)); }
   $("cd").textContent = "";
-  const v = $("v"), c = document.createElement("canvas"); c.width = v.videoWidth; c.height = v.videoHeight;
-  c.getContext("2d").drawImage(v, 0, 0);
-  S.photos[i] = { cv: c, url: c.toDataURL("image/jpeg", .6) }; drawSlots();
+  if (!$("shoot").classList.contains("on")) return;
+  const v = $("v"), [sx, sy, sw, sh] = crop43(v), k = Math.min(1, 1600 / sw);
+  const c = document.createElement("canvas"); c.width = Math.round(sw * k); c.height = Math.round(sh * k);
+  c.getContext("2d").drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  const th = document.createElement("canvas"); th.width = 240; th.height = 180; th.getContext("2d").drawImage(c, 0, 0, 240, 180);
+  S.photos.push({ cv: c, url: th.toDataURL("image/jpeg", .7) }); drawSlots();
 };
-$("next").onclick = compose;
+$("next").onclick = review;
+$("again").onclick = () => {
+  show("shoot"); drawSlots(); clearInterval(S.fiv); S.fiv = setInterval(grabFrame, 1000);
+  timer(S.cfg.tPhoto, () => S.photos.length >= S.tpl.slots.length ? review() : home());
+};
 
-// ---------- 4. gabung otomatis + 5. review & unggah ----------
-const load = u => new Promise((r, j) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => r(i); i.onerror = j; i.src = u; });
-function fit(c, max) { let q = .85, u; do { u = c.toDataURL("image/jpeg", q); q -= .07; } while (u.length > max && q > .3); return u; }
-async function compose() {
-  show("review"); timer(S.cfg.tReview, home); $("qrbox").innerHTML = "";
-  try {
-    const t = S.tpl, c = document.createElement("canvas"); c.width = t.w; c.height = t.h;
-    const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, t.w, t.h);
-    t.slots.forEach((s, i) => {
-      const p = S.photos[i].cv, k = Math.max(s.w / p.width, s.h / p.height), w = p.width * k, h = p.height * k;
+// ---------- 4. review: hapus & urutkan foto di template ----------
+function review() {
+  clearInterval(S.fiv);
+  S.place = S.tpl.slots.map((_, i) => i < S.photos.length ? i : null);
+  show("review"); $("again").hidden = S.photos.length >= maxPool();
+  timer(S.cfg.tReview, () => autoFill() ? save() : home());
+  refresh();
+}
+function autoFill() {
+  for (let i = 0; i < S.place.length; i++) if (S.place[i] == null) {
+    const free = S.photos.findIndex((_, j) => !S.place.includes(j)); if (free < 0) return false; S.place[i] = free;
+  }
+  return true;
+}
+async function renderTpl(c, preview) {
+  const t = S.tpl, img = await S.tplP;
+  c.width = t.w; c.height = t.h;
+  const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, t.w, t.h);
+  t.slots.forEach((s, i) => {
+    const pi = S.place[i];
+    if (pi != null) {
+      const p = S.photos[pi].cv, k = Math.max(s.w / p.width, s.h / p.height), w = p.width * k, h = p.height * k;
       x.save(); x.beginPath(); x.rect(s.x, s.y, s.w, s.h); x.clip();
       x.drawImage(p, s.x + (s.w - w) / 2, s.y + (s.h - h) / 2, w, h); x.restore();
+    } else if (preview) { x.fillStyle = "#2b3040"; x.fillRect(s.x, s.y, s.w, s.h); }
+  });
+  x.drawImage(img, 0, 0, t.w, t.h); // bingkai di atas foto
+  if (preview) {
+    x.textAlign = "center"; x.textBaseline = "middle";
+    t.slots.forEach((s, i) => {
+      const m = Math.min(s.w, s.h);
+      if (S.place[i] != null) {
+        const r = m * .07, cx = s.x + r * 1.6, cy = s.y + r * 1.6;
+        x.fillStyle = "#ffd24a"; x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill();
+        x.fillStyle = "#111"; x.font = `700 ${r * 1.3}px system-ui`; x.fillText(i + 1, cx, cy + r * .06);
+      } else {
+        x.fillStyle = "#ffffffcc"; x.font = `700 ${m * .4}px system-ui`; x.fillText(i + 1, s.x + s.w / 2, s.y + s.h / 2);
+      }
     });
-    x.drawImage(await load(t.url), 0, 0, t.w, t.h); // bingkai di atas foto
-    const url = fit(c, 900000); $("result").src = url;
-    const id = crypto.randomUUID().slice(0, 12);
-    await setDoc(doc(db, "results", id), { img: url, created: Date.now(), owner: S.uid });
-    new QRCode($("qrbox"), { text: location.origin + location.pathname + "?d=" + id, width: 220, height: 220 });
-  } catch (e) { alert("Gagal menyimpan hasil: " + e.message); }
+  }
+  return c;
+}
+function drawTray() {
+  const el = $("tray"); el.innerHTML = "";
+  S.photos.forEach((p, idx) => {
+    const d = document.createElement("div"), no = S.place.indexOf(idx); d.className = "tp" + (no >= 0 ? " pl" : "");
+    const im = new Image(); im.src = p.url; d.append(im);
+    if (no >= 0) { const b = document.createElement("i"); b.textContent = no + 1; d.append(b); }
+    const z = document.createElement("button"); z.className = "s"; z.textContent = "🔍";
+    z.onclick = e => { e.stopPropagation(); zoom(p.cv.toDataURL("image/jpeg", .9)); };
+    d.append(z); d.onclick = () => toggle(idx); el.append(d);
+  });
+}
+function toggle(idx) {
+  const s = S.place.indexOf(idx);
+  if (s >= 0) S.place[s] = null; else { const e = S.place.indexOf(null); if (e < 0) return; S.place[e] = idx; }
+  refresh();
+}
+function refresh() {
+  drawTray(); renderTpl($("pv"), true);
+  const full = !S.place.includes(null); $("save").disabled = !full;
+  $("rvhint").textContent = full
+    ? "Semua slot terisi. Klik slot atau foto untuk melepasnya, atau “Urutkan ulang” untuk menyusun dari awal."
+    : "Klik foto di bawah secara berurutan untuk mengisi slot 1, 2, 3, dan seterusnya.";
+}
+$("reorder").onclick = () => { S.place = S.tpl.slots.map(() => null); refresh(); };
+$("pv").onclick = e => {
+  const r = $("pv").getBoundingClientRect(), t = S.tpl, px = (e.clientX - r.left) * t.w / r.width, py = (e.clientY - r.top) * t.h / r.height;
+  const i = t.slots.findIndex(s => px >= s.x && px <= s.x + s.w && py >= s.y && py <= s.y + s.h);
+  if (i >= 0 && S.place[i] != null) { S.place[i] = null; refresh(); }
+};
+
+// ---------- 5. simpan (template + foto asli + timelapse) ----------
+function fit(c, max) { let q = .85, u; do { u = c.toDataURL("image/jpeg", q); q -= .07; } while (u.length > max && q > .3); return u; }
+$("save").onclick = save;
+async function save() {
+  clearInterval(S.tm); $("timer").textContent = ""; $("busy").classList.add("on");
+  try {
+    const id = crypto.randomUUID().slice(0, 12), owner = S.uid, created = Date.now();
+    const url = fit(await renderTpl(document.createElement("canvas"), false), 900000);
+    const origs = S.place.map(i => fit(S.photos[i].cv, 900000));
+    const chunks = []; let cur = [], size = 0;
+    S.frames.forEach(f => { if (size + f.length > 800000) { chunks.push(cur); cur = []; size = 0; } cur.push(f); size += f.length; });
+    if (cur.length) chunks.push(cur);
+    const part = (n, data) => setDoc(doc(db, "results", id, "parts", n), { ...data, owner, created });
+    await Promise.all([...origs.map((u, k) => part("o" + k, { img: u, k })), ...chunks.map((fr, k) => part("t" + k, { frames: fr, k }))]);
+    await setDoc(doc(db, "results", id), { img: url, created, owner, n: origs.length, t: chunks.length });
+    $("busy").classList.remove("on"); finish(url, id);
+  } catch (e) { $("busy").classList.remove("on"); alert("Gagal menyimpan hasil: " + e.message); timer(S.cfg.tReview, home); }
 }
 
-// ---------- 6. halaman unduh (dibuka dari QR di HP customer) ----------
+// ---------- 6. halaman QR + cetak ----------
+function finish(url, id) {
+  show("done"); $("final").src = url; $("prtimg").src = url; $("qrbox").innerHTML = "";
+  new QRCode($("qrbox"), { text: location.origin + location.pathname + "?d=" + id, width: 220, height: 220 });
+  timer(S.cfg.tDone, home);
+}
+$("print").onclick = () => { clearInterval(S.tm); $("timer").textContent = ""; window.print(); };
+addEventListener("afterprint", () => { if ($("done").classList.contains("on")) timer(S.cfg.tDone, home); });
+
+// ---------- 7. halaman unduh (dibuka dari QR di HP customer) ----------
 const dId = new URLSearchParams(location.search).get("d");
+async function buildVideo(frames, onp) {
+  const imgs = await Promise.all(frames.map(f => load("data:image/jpeg;base64," + f)));
+  const c = document.createElement("canvas"); c.width = 320; c.height = 240; const x = c.getContext("2d");
+  const mime = ["video/mp4", "video/webm;codecs=vp9", "video/webm"].find(m => MediaRecorder.isTypeSupported(m));
+  const rec = new MediaRecorder(c.captureStream(15), mime ? { mimeType: mime, videoBitsPerSecond: 2e6 } : {});
+  const parts = []; rec.ondataavailable = e => e.data.size && parts.push(e.data);
+  const stopped = new Promise(r => rec.onstop = r);
+  x.drawImage(imgs[0], 0, 0, 320, 240); rec.start();
+  for (let i = 0; i < imgs.length; i++) { x.drawImage(imgs[i], 0, 0, 320, 240); onp(i / imgs.length); await new Promise(r => setTimeout(r, 100)); }
+  rec.stop(); await stopped;
+  const type = rec.mimeType || mime || "video/webm";
+  return { blob: new Blob(parts, { type }), ext: type.includes("mp4") ? "mp4" : "webm" };
+}
 if (dId) {
   show("dl"); $("timer").hidden = true;
-  getDoc(doc(db, "results", dId)).then(s => {
-    if (!s.exists()) { $("dlmsg").textContent = "Foto tidak ditemukan atau sudah kedaluwarsa."; return; }
-    const url = s.data().img; $("dlimg").src = url; $("dlbtn").hidden = false;
-    $("dlbtn").onclick = () => { const a = document.createElement("a"); a.href = url; a.download = "photobooth.jpg"; a.click(); };
-  });
+  (async () => {
+    const s = await getDoc(doc(db, "results", dId));
+    if (!s.exists()) { $("dlmsg").textContent = "Foto tidak ditemukan atau sudah kedaluwarsa."; $("dlimg").hidden = true; return; }
+    const url = s.data().img; $("dlimg").src = url; $("dlmain").href = url; $("dlmain").hidden = false;
+    const ps = (await getDocs(collection(db, "results", dId, "parts"))).docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.k - b.k);
+    const origs = ps.filter(p => p.id[0] === "o");
+    if (origs.length) {
+      $("orgc").hidden = false;
+      origs.forEach(p => {
+        const d = document.createElement("div"), im = new Image(); im.src = p.img;
+        const a = Object.assign(document.createElement("a"), { className: "btn s", textContent: "Unduh", href: p.img, download: `foto-${p.k + 1}.jpg` });
+        d.append(im, a); $("orgs").append(d);
+      });
+    }
+    const frames = ps.filter(p => p.id[0] === "t").flatMap(p => p.frames);
+    if (frames.length > 1 && window.MediaRecorder) {
+      $("vidc").hidden = false;
+      $("mkvid").onclick = async () => {
+        $("mkvid").disabled = true;
+        try {
+          const { blob, ext } = await buildVideo(frames, p => $("vidst").textContent = "Membuat video… " + Math.round(p * 100) + "%");
+          const u = URL.createObjectURL(blob), v = $("dlvid2"); v.src = u; v.hidden = false;
+          Object.assign($("dlvid"), { href: u, download: "timelapse." + ext }); $("dlvid").hidden = false; $("mkvid").hidden = true; $("vidst").textContent = "";
+        } catch (e) { $("vidst").textContent = "Gagal membuat video: " + e.message; $("mkvid").disabled = false; }
+      };
+    }
+  })().catch(e => { $("dlmsg").textContent = "Gagal memuat: " + e.message; });
 }
 
 // ---------- kamera iPhone via WebRTC (dari prototipe) ----------
 let pc = null, unsubCand = null, handled = null;
 async function cleanup() {
-  try { (await getDocs(query(collection(db, "results"), where("created", "<", Date.now() - 6048e5)))).forEach(d => deleteDoc(d.ref)); } catch {}
+  try {
+    const old = await getDocs(query(collection(db, "results"), where("created", "<", Date.now() - 6048e5)));
+    for (const d of old.docs) {
+      try { const ps = await getDocs(collection(db, "results", d.id, "parts")); await Promise.all(ps.docs.map(p => deleteDoc(p.ref))); } catch {}
+      await deleteDoc(d.ref);
+    }
+  } catch {}
 }
 function bootCamera() {
   cleanup();
@@ -243,7 +485,7 @@ $("doLogin").onclick = async () => {
   try { await signInWithEmailAndPassword(auth, $("em").value, $("pw").value); home(); }
   catch (e) { alert("Login gagal: " + e.message); }
 };
-const L = { price: "Harga (Rp)", tPay: "Waktu bayar (dtk)", tTpl: "Waktu pilih template (dtk)", tPhoto: "Waktu sesi foto (dtk)", cd: "Hitung mundur foto (dtk)", tReview: "Waktu review (dtk)" };
+const L = { price: "Harga (Rp)", tPay: "Waktu bayar (dtk)", tTpl: "Waktu pilih template (dtk)", tPhoto: "Waktu sesi foto (dtk)", cd: "Hitung mundur foto (dtk)", tReview: "Waktu atur hasil foto (dtk)", tDone: "Waktu halaman QR/cetak (dtk)" };
 $("fields").innerHTML = Object.entries(L).map(([k, t]) => `<label>${t}<input id="f_${k}" type="number"></label>`).join("")
   + `<label>Lewati pembayaran (mode uji)<input id="f_bypass" type="checkbox"></label>`
   + `<label>Mode pembayaran<select id="f_payMode" style="width:140px"><option value="manual">Manual</option></select></label>`
@@ -257,7 +499,7 @@ async function shrink(file, max) {
   const im = await createImageBitmap(file), k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement("canvas");
   c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); return c.toDataURL("image/png");
 }
-$("save").onclick = async () => {
+$("save2").onclick = async () => {
   const c = { bypass: $("f_bypass").checked, payMode: $("f_payMode").value, pin: $("f_pin").value }; Object.keys(L).forEach(k => c[k] = +$("f_" + k).value);
   try {
     const q = $("f_qris").files[0]; if (q) c.qrisImg = await shrink(q, 700);
