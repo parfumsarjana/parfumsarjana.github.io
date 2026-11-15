@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Photobooth: Kamera</title>
+  <style>
+    :root{color-scheme:dark}
+    html,body{height:100%;margin:0}
+    body{font-family:system-ui,sans-serif;background:#000;color:#eee;display:flex;flex-direction:column}
+    video{flex:1;min-height:0;width:100%;object-fit:contain;background:#000}
+    .bar{padding:12px;display:flex;gap:8px;flex-wrap:wrap}
+    button,select{font-size:16px;padding:10px 14px;border-radius:10px;border:0}
+    #status{padding:0 12px 14px;font-size:14px;opacity:.85}
+  </style>
+</head>
+<body>
+  <video id="preview" autoplay muted playsinline></video>
+  <div class="bar">
+    <select id="facing" aria-label="Pilih kamera">
+      <option value="environment">Kamera belakang</option>
+      <option value="user">Kamera depan</option>
+    </select>
+    <button id="start">Mulai kamera</button>
+  </div>
+  <div id="status">Belum dimulai.</div>
+
+  <script type="module">
+    import { roomRef, candCol, rtcConfig } from "./common.js";
+    import { setDoc, onSnapshot, addDoc, query, where }
+      from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+    const $ = id => document.getElementById(id);
+    const setStatus = t => { $("status").textContent = t; };
+
+    let stream = null, pc = null, session = null, unsubCand = null;
+    let lastWant = null, answeredFor = null, queue = [];
+
+    async function startCamera() {
+      try {
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: $("facing").value },
+            width: { ideal: 1920 }, height: { ideal: 1080 },
+            frameRate: { ideal: 30 }
+          },
+          audio: false
+        });
+        $("preview").srcObject = stream;
+        try { await navigator.wakeLock?.request("screen"); } catch {}
+        const s = stream.getVideoTracks()[0].getSettings();
+        setStatus(`Kamera aktif (${s.width}x${s.height}). Menunggu tablet…`);
+        await startSession();
+      } catch (e) {
+        setStatus("Gagal: " + e.message);
+      }
+    }
+
+    async function startSession() {
+      if (!stream) return;
+      unsubCand?.();
+      pc?.close();
+      queue = [];
+      const mySession = crypto.randomUUID();
+      session = mySession;
+      const peer = pc = new RTCPeerConnection(rtcConfig);
+      stream.getTracks().forEach(t => peer.addTrack(t, stream));
+
+      peer.onicecandidate = e => {
+        if (e.candidate) {
+          addDoc(candCol, { from: "camera", session: mySession, candidate: e.candidate.toJSON() });
+        }
+      };
+      peer.onconnectionstatechange = () => {
+        if (pc !== peer) return;
+        setStatus("Koneksi: " + peer.connectionState);
+        if (peer.connectionState === "failed") {
+          setTimeout(() => { if (pc === peer) startSession(); }, 1500);
+        }
+      };
+
+      unsubCand = onSnapshot(query(candCol, where("session", "==", mySession)), snap => {
+        snap.docChanges().forEach(ch => {
+          if (ch.type !== "added") return;
+          const d = ch.doc.data();
+          if (d.from !== "booth") return;
+          if (peer.remoteDescription) peer.addIceCandidate(d.candidate).catch(() => {});
+          else queue.push(d.candidate);
+        });
+      });
+
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+      await setDoc(roomRef, {
+        offer: { type: offer.type, sdp: offer.sdp },
+        session: mySession,
+        answer: null,
+        answerSession: null
+      }, { merge: true });
+    }
+
+    // Satu listener untuk room: menerima answer dan permintaan sambung ulang dari tablet.
+    onSnapshot(roomRef, async snap => {
+      const d = snap.data();
+      if (!d) return;
+      if (lastWant === null) {
+        lastWant = d.want ?? 0;
+      } else if (d.want && d.want !== lastWant) {
+        lastWant = d.want;
+        if (stream) startSession();
+        return;
+      }
+      if (d.answer && d.answerSession === session && pc && answeredFor !== session) {
+        answeredFor = session;
+        await pc.setRemoteDescription(d.answer);
+        queue.splice(0).forEach(c => pc.addIceCandidate(c).catch(() => {}));
+      }
+    });
+
+    $("start").addEventListener("click", startCamera);
+    $("facing").addEventListener("change", () => { if (stream) startCamera(); });
+  </script>
+</body>
+</html>

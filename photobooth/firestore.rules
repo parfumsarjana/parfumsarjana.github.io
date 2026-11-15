@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    match /settings/{d}  { allow read: if true; allow write: if isAdmin(); }
+    match /templates/{d} { allow read: if true; allow write: if isAdmin(); }
+    match /orders/{d}    { allow read: if true; }
+    match /results/{d}   { allow read: if true; allow create: if true; }
+    match /admins/{d}    { allow read: if request.auth != null && request.auth.uid == d; }
+    // signaling kamera iPhone (prototipe: terbuka)
+    match /rooms/{r} {
+      allow read, write: if true;
+      match /candidates/{c} { allow read, write: if true; }
+    }
+  }
+}
