@@ -40,7 +40,7 @@ label input{width:140px}
   <h2>Scan QRIS untuk membayar</h2>
   <img id="qr" width="280" height="280" alt="QRIS" style="background:#fff;border-radius:12px">
   <div id="amt"></div>
-  <button class="s" data-home>Batal</button>
+  <div class="row"><button class="s" data-home>Batal</button><button id="opconf" class="s" style="font-size:14px">Konfirmasi (operator)</button></div>
 </section>
 
 <section id="pick">
@@ -94,15 +94,14 @@ label input{width:140px}
 
 <script type="module">
 import { app, db, roomRef, candCol, rtcConfig } from "./common.js";
-import { getFirestore, doc, collection, onSnapshot, setDoc, getDoc, addDoc, deleteDoc, updateDoc, query, where }
+import { getFirestore, doc, collection, onSnapshot, setDoc, getDoc, addDoc, deleteDoc, updateDoc, query, where, getDocs }
   from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { getStorage, ref as sref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js";
 
 const $ = id => document.getElementById(id);
-const auth = getAuth(app), storage = getStorage(app), createQris = httpsCallable(getFunctions(app), "createQris");
-const S = { cfg: { price: 20000, tPay: 120, tTpl: 60, tPhoto: 180, cd: 3, tReview: 60, bypass: true }, tpls: [], tpl: null, photos: [], tm: null, unsub: null };
+const auth = getAuth(app), createQris = httpsCallable(getFunctions(app), "createQris");
+const S = { cfg: { price: 20000, tPay: 120, tTpl: 60, tPhoto: 180, cd: 3, tReview: 60, bypass: true, payMode: "manual", pin: "", qrisImg: "" }, tpls: [], tpl: null, photos: [], tm: null, unsub: null };
 const show = id => document.querySelectorAll("section").forEach(s => s.classList.toggle("on", s.id === id));
 function timer(sec, end) {
   clearInterval(S.tm); let n = sec;
@@ -124,14 +123,17 @@ $("start").onclick = pay;
 async function pay() {
   if (S.cfg.bypass) return pick();
   show("pay"); timer(S.cfg.tPay, home);
-  $("qr").removeAttribute("src");
   $("amt").textContent = "Rp " + Number(S.cfg.price).toLocaleString("id-ID");
+  const auto = S.cfg.payMode === "auto"; $("opconf").hidden = auto;
+  if (!auto) { $("qr").src = S.cfg.qrisImg || ""; return; }
+  $("qr").removeAttribute("src");
   try {
     const { orderId, qrUrl } = (await createQris()).data;
     $("qr").src = qrUrl;
     S.unsub = onSnapshot(doc(db, "orders", orderId), s => { if (s.data()?.status === "paid") { S.unsub(); pick(); } });
   } catch (e) { $("amt").textContent = "Gagal membuat QRIS: " + e.message; }
 }
+$("opconf").onclick = () => { const p = prompt("PIN operator:"); if (p === null) return; p === String(S.cfg.pin || "") ? pick() : alert("PIN salah"); };
 
 // ---------- 2. pilih template ----------
 function pick() {
@@ -168,22 +170,23 @@ $("next").onclick = compose;
 
 // ---------- 4. gabung otomatis + 5. review & unggah ----------
 const load = u => new Promise((r, j) => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => r(i); i.onerror = j; i.src = u; });
+function fit(c, max) { let q = .85, u; do { u = c.toDataURL("image/jpeg", q); q -= .07; } while (u.length > max && q > .3); return u; }
 async function compose() {
   show("review"); timer(S.cfg.tReview, home); $("qrbox").innerHTML = "";
-  const t = S.tpl, c = document.createElement("canvas"); c.width = t.w; c.height = t.h;
-  const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, t.w, t.h);
-  t.slots.forEach((s, i) => {
-    const p = S.photos[i].cv, k = Math.max(s.w / p.width, s.h / p.height), w = p.width * k, h = p.height * k;
-    x.save(); x.beginPath(); x.rect(s.x, s.y, s.w, s.h); x.clip();
-    x.drawImage(p, s.x + (s.w - w) / 2, s.y + (s.h - h) / 2, w, h); x.restore();
-  });
-  x.drawImage(await load(t.url), 0, 0, t.w, t.h); // bingkai di atas foto
-  $("result").src = c.toDataURL("image/jpeg", .85);
-  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", .9));
-  const id = crypto.randomUUID().slice(0, 12), rf = sref(storage, "results/" + id + ".jpg");
-  await uploadBytes(rf, blob, { contentType: "image/jpeg" });
-  await setDoc(doc(db, "results", id), { url: await getDownloadURL(rf), created: Date.now() });
-  new QRCode($("qrbox"), { text: location.origin + "/?d=" + id, width: 220, height: 220 });
+  try {
+    const t = S.tpl, c = document.createElement("canvas"); c.width = t.w; c.height = t.h;
+    const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, t.w, t.h);
+    t.slots.forEach((s, i) => {
+      const p = S.photos[i].cv, k = Math.max(s.w / p.width, s.h / p.height), w = p.width * k, h = p.height * k;
+      x.save(); x.beginPath(); x.rect(s.x, s.y, s.w, s.h); x.clip();
+      x.drawImage(p, s.x + (s.w - w) / 2, s.y + (s.h - h) / 2, w, h); x.restore();
+    });
+    x.drawImage(await load(t.url), 0, 0, t.w, t.h); // bingkai di atas foto
+    const url = fit(c, 900000); $("result").src = url;
+    const id = crypto.randomUUID().slice(0, 12);
+    await setDoc(doc(db, "results", id), { img: url, created: Date.now() });
+    new QRCode($("qrbox"), { text: location.origin + location.pathname + "?d=" + id, width: 220, height: 220 });
+  } catch (e) { alert("Gagal menyimpan hasil: " + e.message); }
 }
 
 // ---------- 6. halaman unduh (dibuka dari QR di HP customer) ----------
@@ -192,19 +195,18 @@ if (dId) {
   show("dl"); $("timer").hidden = true;
   getDoc(doc(db, "results", dId)).then(s => {
     if (!s.exists()) { $("dlmsg").textContent = "Foto tidak ditemukan atau sudah kedaluwarsa."; return; }
-    const url = s.data().url; $("dlimg").src = url;
-    $("dlimg").onerror = () => { $("dlimg").hidden = true; $("dlmsg").textContent = "Foto sudah kedaluwarsa (disimpan maks. 7 hari)."; };
-    $("dlbtn").hidden = false;
-    $("dlbtn").onclick = async () => {
-      const a = document.createElement("a"); a.href = URL.createObjectURL(await (await fetch(url)).blob());
-      a.download = "photobooth.jpg"; a.click();
-    };
+    const url = s.data().img; $("dlimg").src = url; $("dlbtn").hidden = false;
+    $("dlbtn").onclick = () => { const a = document.createElement("a"); a.href = url; a.download = "photobooth.jpg"; a.click(); };
   });
 } else bootCamera();
 
 // ---------- kamera iPhone via WebRTC (dari prototipe) ----------
 let pc = null, unsubCand = null, handled = null;
+async function cleanup() {
+  try { (await getDocs(query(collection(db, "results"), where("created", "<", Date.now() - 6048e5)))).forEach(d => deleteDoc(d.ref)); } catch {}
+}
 function bootCamera() {
+  cleanup();
   setDoc(roomRef, { want: Date.now() }, { merge: true });
   onSnapshot(roomRef, snap => { const d = snap.data(); if (d?.offer && d.session && d.session !== handled) answer(d); });
 }
@@ -229,14 +231,24 @@ $("doLogin").onclick = async () => {
 };
 const L = { price: "Harga (Rp)", tPay: "Waktu bayar (dtk)", tTpl: "Waktu pilih template (dtk)", tPhoto: "Waktu sesi foto (dtk)", cd: "Hitung mundur foto (dtk)", tReview: "Waktu review (dtk)" };
 $("fields").innerHTML = Object.entries(L).map(([k, t]) => `<label>${t}<input id="f_${k}" type="number"></label>`).join("")
-  + `<label>Lewati pembayaran (mode uji)<input id="f_bypass" type="checkbox"></label>`;
+  + `<label>Lewati pembayaran (mode uji)<input id="f_bypass" type="checkbox"></label>`
+  + `<label>Mode pembayaran<select id="f_payMode" style="width:140px"><option value="manual">Manual</option><option value="auto">Otomatis</option></select></label>`
+  + `<label>PIN operator<input id="f_pin" type="text"></label>`
+  + `<label>Gambar QRIS<input id="f_qris" type="file" accept="image/*"></label>`;
 function adminOpen() {
   show("admin"); clearInterval(S.tm); $("timer").textContent = "";
-  Object.keys(L).forEach(k => $("f_" + k).value = S.cfg[k]); $("f_bypass").checked = !!S.cfg.bypass; listTpls();
+  Object.keys(L).forEach(k => $("f_" + k).value = S.cfg[k]); $("f_bypass").checked = !!S.cfg.bypass; $("f_payMode").value = S.cfg.payMode || "manual"; $("f_pin").value = S.cfg.pin || ""; listTpls();
+}
+async function shrink(file, max) {
+  const im = await createImageBitmap(file), k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement("canvas");
+  c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); return c.toDataURL("image/png");
 }
 $("save").onclick = async () => {
-  const c = { bypass: $("f_bypass").checked }; Object.keys(L).forEach(k => c[k] = +$("f_" + k).value);
-  try { await setDoc(doc(db, "settings", "main"), c, { merge: true }); alert("Tersimpan"); } catch (e) { alert(e.message); }
+  const c = { bypass: $("f_bypass").checked, payMode: $("f_payMode").value, pin: $("f_pin").value }; Object.keys(L).forEach(k => c[k] = +$("f_" + k).value);
+  try {
+    const q = $("f_qris").files[0]; if (q) c.qrisImg = await shrink(q, 700);
+    await setDoc(doc(db, "settings", "main"), c, { merge: true }); alert("Tersimpan");
+  } catch (e) { alert(e.message); }
 };
 function listTpls() {
   $("tlist").innerHTML = "";
@@ -294,12 +306,25 @@ function drawDet() {
   $("t_hint").textContent = `${det.boxes.length} area foto terdeteksi. Angka = urutan foto. ` + (ok ? "Klik kotak untuk mengubah urutan." : "Lanjut klik kotak sesuai urutan.");
 }
 $("addtpl").onclick = async () => {
+  const btn = $("addtpl"), hint = $("t_hint"), f = $("t_file").files[0];
+  if (!f || !det) { hint.textContent = "Pilih file PNG dulu dan tunggu kotak hijau muncul."; return; }
+  btn.disabled = true; btn.textContent = "Menyimpan…";
+  const limit = (p, ms, msg) => Promise.race([p, new Promise((_, j) => setTimeout(() => j(new Error(msg)), ms))]);
   try {
-    const f = $("t_file").files[0]; if (!f || !det) return;
-    const rf = sref(storage, "templates/" + Date.now() + ".png"); await uploadBytes(rf, f);
-    await addDoc(collection(db, "templates"), { name: $("t_name").value || "Template", url: await getDownloadURL(rf), w: det.w, h: det.h, slots: det.order.map(i => det.boxes[i]) });
-    alert("Template ditambahkan"); $("t_file").value = ""; $("t_name").value = ""; $("t_prev").style.display = "none"; $("t_hint").textContent = ""; det = null; $("addtpl").disabled = true;
-  } catch (e) { alert(e.message); }
+    if (!auth.currentUser) throw new Error("Belum login. Keluar lalu login admin lagi.");
+    const im = await createImageBitmap(f); let k = Math.min(1, 1600 / Math.max(im.width, im.height)), c, url;
+    for (;;) {
+      c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); url = c.toDataURL("image/png");
+      if (url.length < 950000 || k < .3) break; k *= .8;
+    }
+    if (url.length >= 1000000) throw new Error("Template terlalu besar/rumit. Perkecil atau sederhanakan gambarnya.");
+    const slots = det.order.map(i => { const b = det.boxes[i]; return { x: Math.round(b.x * c.width / det.w), y: Math.round(b.y * c.height / det.h), w: Math.round(b.w * c.width / det.w), h: Math.round(b.h * c.height / det.h) }; });
+    await limit(addDoc(collection(db, "templates"), { name: $("t_name").value || "Template", url, w: c.width, h: c.height, slots }), 20000,
+      "Gagal menyimpan. Cek rules Firestore dan dokumen admins/<UID>.");
+    alert("Template ditambahkan"); $("t_file").value = ""; $("t_name").value = ""; $("t_prev").style.display = "none"; hint.textContent = ""; det = null;
+  } catch (e) { hint.textContent = "Gagal: " + e.message; alert("Gagal: " + e.message); btn.disabled = false; }
+  btn.textContent = "Tambah template"; if (det) btn.disabled = false;
 };
 $("out").onclick = async () => { await signOut(auth); home(); };
 </script>

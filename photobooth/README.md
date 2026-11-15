@@ -1,22 +1,14 @@
-# Photobooth app
+# Photobooth (paket Spark / GitHub Pages)
 
-Halaman: `/` (booth tablet, Chrome), `/camera` (iPhone, Safari), `/?d=ID` (unduh, dibuka dari QR).
+## Pasang
+1. Upload semua file kecuali `firestore.rules` dan `README.md` ke root repo GitHub Pages.
+2. Firebase Console → Firestore → Rules: tempel isi `firestore.rules`, lalu Publish.
+3. Authentication → Sign-in method: aktifkan Email/Password, lalu buat 1 user admin (tab Users).
+4. Firestore: buat koleksi `admins`, dokumen dengan ID = UID user admin tadi (isi bebas, mis. ok: true).
 
-## Setup (sekali)
-1. Firebase: aktifkan Firestore, Authentication (Email/Password), Storage, dan paket Blaze (untuk Functions + Storage).
-2. Isi `public/firebase-config.js` dengan config web app.
-3. Authentication → buat 1 user admin. Di Firestore buat dokumen `admins/<UID user itu>` (isi bebas, mis. `{ok:true}`).
-4. Midtrans: ambil Server Key (sandbox dulu), lalu:
-       firebase functions:secrets:set MIDTRANS_SERVER_KEY
-5. Deploy:
-       cd functions && npm install && cd ..
-       firebase use --add
-       firebase deploy
-6. Isi URL function `midtransWebhook` di dashboard Midtrans (Payment Notification URL).
-7. Hapus otomatis 7 hari + izin CORS untuk Storage (ganti BUCKET, mis. PROJECT_ID.appspot.com):
-       gcloud storage buckets update gs://BUCKET --lifecycle-file=lifecycle.json --cors-file=cors.json
-
-## Pemakaian
-- Login lewat tombol Pengaturan di halaman pembuka: harga, semua waktu, tambah/hapus template.
-- "Lewati pembayaran" aktif secara default supaya alur bisa dites tanpa Midtrans. Matikan untuk produksi.
-- Template = PNG dengan area foto transparan. Posisi foto diisi per baris `x,y,w,h` (piksel gambar template).
+## Pakai
+- Tablet (Chrome): buka alamat situs (`index.html`).
+- iPhone (Safari): buka `.../camera.html`, tekan "Mulai kamera".
+- Pengaturan (tombol kanan bawah halaman pembuka): harga, waktu, mode pembayaran, PIN operator, gambar QRIS, template.
+- Template: PNG dengan area foto transparan. Area foto terdeteksi otomatis, klik kotak untuk mengatur urutan.
+- Mode "Lewati pembayaran" aktif secara default untuk tes. Matikan untuk produksi.
