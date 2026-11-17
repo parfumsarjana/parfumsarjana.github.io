@@ -260,11 +260,12 @@ function syncAr() {
 $("v").addEventListener("loadedmetadata", syncAr); $("v").addEventListener("resize", syncAr);
 new ResizeObserver(syncAr).observe(document.querySelector(".vwrap"));
 $("rot").onclick = () => { rotSaved = (rot + 90) % 360; try { localStorage.setItem("rot", rotSaved); } catch {} syncAr(); };
-function paint(cv, max) { // gambar frame video ke canvas sesuai putaran
-  const v = $("v"), ew = sw90() ? v.videoHeight : v.videoWidth, eh = sw90() ? v.videoWidth : v.videoHeight;
+function paint(cv, max, src = $("v")) { // gambar frame video/foto ke canvas sesuai putaran
+  const sw0 = src.videoWidth || src.width, sh0 = src.videoHeight || src.height;
+  const ew = sw90() ? sh0 : sw0, eh = sw90() ? sw0 : sh0;
   [cv.width, cv.height] = dims(ew, eh, max);
   const x = cv.getContext("2d"), dw = sw90() ? cv.height : cv.width, dh = sw90() ? cv.width : cv.height;
-  x.save(); x.translate(cv.width / 2, cv.height / 2); x.rotate(rot * Math.PI / 180); x.drawImage(v, -dw / 2, -dh / 2, dw, dh); x.restore();
+  x.save(); x.translate(cv.width / 2, cv.height / 2); x.rotate(rot * Math.PI / 180); x.drawImage(src, -dw / 2, -dh / 2, dw, dh); x.restore();
 }
 const fc = document.createElement("canvas");
 function grabFrame() {
@@ -303,7 +304,9 @@ $("snap").onclick = async () => {
   for (let n = S.cfg.cd; n > 0; n--) { $("cd").textContent = n; await new Promise(r => setTimeout(r, 1000)); }
   $("cd").textContent = "";
   if (!$("shoot").classList.contains("on")) return;
-  const c = document.createElement("canvas"); paint(c, 1600);
+  const c = document.createElement("canvas");
+  const still = await getStill().catch(() => null); // foto resolusi penuh dari iPhone; jika gagal pakai frame video
+  paint(c, 1600, still || $("v")); still?.close?.();
   const th = document.createElement("canvas"); [th.width, th.height] = dims(c.width, c.height, 240); th.getContext("2d").drawImage(c, 0, 0, th.width, th.height);
   S.photos.push({ cv: c, url: th.toDataURL("image/jpeg", .7) }); drawSlots();
 };
@@ -462,6 +465,29 @@ if (dId) {
 
 // ---------- kamera iPhone via WebRTC (dari prototipe) ----------
 let pc = null, unsubCand = null, handled = null;
+let dc = null, rx = null;
+function onDcMsg(e) {
+  if (typeof e.data === "string") {
+    const m = JSON.parse(e.data);
+    if (m.t === "hdr" && rx && rx.id === m.id) { rx.size = m.size; if (rx.got >= rx.size) rx.finish(); }
+    return;
+  }
+  if (!rx) return;
+  rx.chunks.push(e.data); rx.got += e.data.byteLength;
+  if (rx.size && rx.got >= rx.size) rx.finish();
+}
+function getStill(ms = 8000) {
+  return new Promise((res, rej) => {
+    if (!dc || dc.readyState !== "open") return rej(new Error("channel belum siap"));
+    const id = crypto.randomUUID(), r = { id, chunks: [], got: 0, size: 0 };
+    const t = setTimeout(() => { if (rx === r) rx = null; rej(new Error("timeout")); }, ms);
+    r.finish = async () => {
+      clearTimeout(t); if (rx === r) rx = null;
+      try { res(await createImageBitmap(new Blob(r.chunks, { type: "image/jpeg" }))); } catch (err) { rej(err); }
+    };
+    rx = r; dc.send(JSON.stringify({ t: "snap", id }));
+  });
+}
 async function cleanup() {
   try {
     const old = await getDocs(query(collection(db, "results"), where("created", "<", Date.now() - 6048e5)));
@@ -480,6 +506,7 @@ async function answer(d) {
   const session = handled = d.session; unsubCand?.(); pc?.close();
   const peer = pc = new RTCPeerConnection(rtcConfig);
   peer.ontrack = e => { $("v").srcObject = e.streams[0]; $("v").play().catch(() => {}); };
+  peer.ondatachannel = e => { dc = e.channel; dc.binaryType = "arraybuffer"; dc.onmessage = onDcMsg; };
   peer.onicecandidate = e => { if (e.candidate) addDoc(candCol(S.uid), { from: "booth", session, candidate: e.candidate.toJSON() }); };
   await peer.setRemoteDescription(d.offer); if (pc !== peer) return;
   unsubCand = onSnapshot(query(candCol(S.uid), where("session", "==", session)), snap => snap.docChanges().forEach(ch => {

@@ -50,7 +50,7 @@
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: $("facing").value },
-            width: { ideal: 1920 }, height: { ideal: 1080 },
+            width: { ideal: 4032 }, height: { ideal: 3024 },
             frameRate: { ideal: 30 }
           },
           audio: false
@@ -73,7 +73,26 @@
       const mySession = crypto.randomUUID();
       session = mySession;
       const peer = pc = new RTCPeerConnection(rtcConfig);
-      stream.getTracks().forEach(t => peer.addTrack(t, stream));
+      const vt = stream.getVideoTracks()[0];
+      vt.contentHint = "detail";
+      const sender = peer.addTrack(vt, stream);
+
+      // Channel untuk mengirim foto resolusi penuh ke tablet
+      const ch = peer.createDataChannel("snap");
+      ch.onmessage = async e => {
+        let m; try { m = JSON.parse(e.data); } catch { return; }
+        if (m.t !== "snap") return;
+        const v = $("preview"), c = document.createElement("canvas");
+        c.width = v.videoWidth; c.height = v.videoHeight;
+        c.getContext("2d").drawImage(v, 0, 0);
+        const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.95));
+        const buf = await blob.arrayBuffer();
+        ch.send(JSON.stringify({ t: "hdr", id: m.id, size: buf.byteLength }));
+        for (let o = 0; o < buf.byteLength; o += 16384) {
+          while (ch.bufferedAmount > 1e6) await new Promise(r => setTimeout(r, 20));
+          ch.send(buf.slice(o, o + 16384));
+        }
+      };
 
       peer.onicecandidate = e => {
         if (e.candidate) {
@@ -100,6 +119,14 @@
 
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
+      // Preview diperkecil; foto tetap diambil resolusi penuh lewat channel di atas
+      try {
+        const p = sender.getParameters();
+        if (!p.encodings?.length) p.encodings = [{}];
+        p.encodings[0].scaleResolutionDownBy = Math.max(1, (vt.getSettings().width || 1920) / 1920);
+        p.encodings[0].maxBitrate = 6_000_000;
+        await sender.setParameters(p);
+      } catch {}
       await setDoc(roomRef(auth.currentUser.uid), {
         offer: { type: offer.type, sdp: offer.sdp },
         session: mySession,
