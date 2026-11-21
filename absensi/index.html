@@ -62,12 +62,41 @@ td button{padding:5px 10px;font-size:12px;margin:0 2px;border-radius:8px}td butt
 .stk td:last-child,.stk th:last-child{position:sticky;right:0;z-index:1;box-shadow:-2px 0 4px -2px #0003}
 .stk td:first-child,.stk td:last-child{background:#fff}.stk th:first-child,.stk th:last-child{background:#fafafa}
 .stk tr:hover td:first-child,.stk tr:hover td:last-child{background:#fafafa}
+
+/* ===== Rapikan tampilan admin ===== */
+:root{--ring:#111}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+button:hover:not(:disabled):not(.p):not(.on):not(.nv){border-color:#9ca3af}button.p:hover:not(:disabled){filter:brightness(.95)}
+input:focus,select:focus{border-color:#111}
+#app.w{padding:20px 18px 48px}
+#app.w .shell{grid-template-columns:240px minmax(0,1fr);gap:28px}
+#app.w .side{top:16px;max-height:calc(100vh - 32px);overflow-y:auto;padding:14px 10px;border-radius:18px;scrollbar-width:thin}
+#app.w .who{padding:2px 8px 12px;margin-bottom:2px}#app.w .who b{font-size:17px}
+#app.w .gl{text-transform:none;letter-spacing:0;font-size:12px;font-weight:600;padding:16px 10px 6px}
+#app.w .gl:first-child{padding-top:8px}#app.w .gl.sep{margin-top:10px;border-top:1px solid var(--b);padding-top:16px}
+#app.w .nv{font-size:14px;padding:8px 12px;transition:background .15s}
+#app.w .nv.on{box-shadow:inset 3px 0 0 #111}
+#app.w .pg{padding:2px 0 14px;margin:0 0 16px;border-bottom:1px solid var(--b)}
+#app.w .pg h2{font-size:26px;letter-spacing:-.01em}#app.w .pg small{display:block;margin-top:4px;font-size:14px}
+small.hint{display:block;color:var(--m);line-height:1.5;margin:2px 0 10px;max-width:70ch}
+#main .tb{margin:12px 0}#main .chips{padding:2px 0 12px}
+#main>button{margin:0 8px 12px 0}
+#main .card{padding:14px;border-radius:14px;margin:10px 0}
+#main .card:has(>.sc:only-child){padding:0;overflow:hidden}
+#main .card:has(>.sc:only-child) .sc{border-radius:0}
+td button{padding:5px 12px;border-radius:8px;font-size:12px}
+td button[data-d]{border-color:#fecaca}td button[data-d]:hover{background:#fef2f2;border-color:#f87171}
+.pwv{font-family:ui-monospace,Menlo,monospace;min-width:64px;background:#f9fafb}
+dialog{padding:20px;box-shadow:0 24px 70px #0005}dialog::backdrop{background:#0007}
+dialog h3{margin:0 0 8px;font-size:19px}
+dialog .row{margin-top:14px}
+@media(max-width:820px){#app.w{padding:10px 10px 40px}#app.w .side{position:sticky;top:0;z-index:5;max-height:none;overflow:visible;border-radius:14px}#app.w .who{padding-bottom:8px}#app.w .nv.on{box-shadow:none}#app.w .pg h2{font-size:22px}}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script></head><body><div id="app">Memuat…</div>
 <script type="module">
-import {initializeApp} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
-import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithEmailAndPassword,createUserWithEmailAndPassword,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
+import {initializeApp,deleteApp} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
+import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithEmailAndPassword,createUserWithEmailAndPassword,onAuthStateChanged,signOut,updatePassword,sendPasswordResetEmail,deleteUser} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {getFirestore,collection,doc,getDoc,getDocs,setDoc,deleteDoc,query} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 import {where} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 const app=initializeApp({apiKey:"AIzaSyBhjjjooVet5-2xZW2wnV3M0bRQJwSrVtU",authDomain:"absensi-9a933.firebaseapp.com",projectId:"absensi-9a933",storageBucket:"absensi-9a933.firebasestorage.app",messagingSenderId:"1000007340641",appId:"1:1000007340641:web:80698cab06303577b59020"});
@@ -106,10 +135,10 @@ window.out=()=>signOut(auth);
 const bar=()=>`<div class="card bar"><b>Absensi</b><span>${esc(me?.name)} · ${me?.role||''}</span><button onclick="out()">Keluar</button></div>`;
 
 const form=(title,fields,v={},extra='')=>new Promise(r=>{const d=document.createElement('dialog');
-d.innerHTML=`<form method=dialog><h3>${title}</h3>${fields.map(([k,l,t,o])=>t=='check'?`<label>${l}</label><div class=chk>${o.map(x=>`<label class=ck><input type=checkbox name=${k} value="${esc(x[0])}"${(v[k]||[]).includes(x[0])?' checked':''}> ${esc(x[1])}</label>`).join('')||'<small>Belum ada data</small>'}</div>`:t=='map'?`<label>${l}</label><div class=row><input id=q placeholder="Cari tempat atau tempel link Google Maps"><button type=button id=sq>Cari</button><button type=button id=me2>Lokasi saya</button></div><div id=mp style="height:250px;border-radius:10px;margin:6px 0"></div><input type=hidden name=lat value="${v.lat??''}"><input type=hidden name=lng value="${v.lng??''}">`:`<label>${l}${t=='select'?`<select name=${k}>${opts(o,v[k])}</select>`:`<input name=${k} type="${t||'text'}" step=any value="${esc(v[k])}">`}</label>`).join('')}${extra}<div class=row><button value=x>Batal</button><button value=ok class=p>Simpan</button></div></form>`;
+d.innerHTML=`<form method=dialog><h3>${title}</h3>${fields.map(([k,l,t,o])=>t=='check'?`<label>${l}</label><div class=chk>${o.map(x=>`<label class=ck><input type=checkbox name=${k} value="${esc(x[0])}"${(v[k]||[]).includes(x[0])?' checked':''}> ${esc(x[1])}</label>`).join('')||'<small>Belum ada data</small>'}</div>`:t=='map'?`<label>${l}</label><div class=row><input id=q placeholder="Cari tempat atau tempel link Google Maps"><button type=button id=sq>Cari</button><button type=button id=me2>Lokasi saya</button></div><div id=mp style="height:250px;border-radius:10px;margin:6px 0"></div><input type=hidden name=lat value="${v.lat??''}"><input type=hidden name=lng value="${v.lng??''}">`:`<label>${l}${t=='select'?`<select name=${k}>${opts(o,v[k])}</select>`:`<input name=${k} type="${t||'text'}" step=any autocomplete=off value="${esc(v[k])}"${k=='email'&&v.id?' readonly':''}>`}</label>`).join('')}${extra}<div class=row><button value=x>Batal</button><button value=ok class=p>Simpan</button></div></form>`;
 document.body.append(d);d.showModal();if(fields.some(f=>f[2]=='map'))mapInit(d);
 d.onclose=()=>{let o=null;if(d.returnValue=='ok'){o={};const fd=new FormData(d.querySelector('form'));fd.forEach((x,k)=>o[k]=x);fields.forEach(f=>f[2]=='check'&&(o[f[0]]=fd.getAll(f[0])));fields.forEach(f=>f[2]=='number'&&(o[f[0]]=+o[f[0]]||0));if('lat'in o){o.lat=+o.lat||0;o.lng=+o.lng||0}}d.remove();r(o)}});
-document.addEventListener('click',e=>{if(e.target.id=='gps')navigator.geolocation.getCurrentPosition(p=>{const f=e.target.form;f.lat.value=p.coords.latitude;f.lng.value=p.coords.longitude},x=>alert(x.message))});
+document.addEventListener('click',async e=>{if(e.target.id=='rst'){const x=e.target.dataset.em;if(!x)return;try{await sendPasswordResetEmail(auth,x);alert('Email reset password dikirim ke '+x)}catch(er){alert(er.message)}return}if(e.target.id=='gps')navigator.geolocation.getCurrentPosition(p=>{const f=e.target.form;f.lat.value=p.coords.latitude;f.lng.value=p.coords.longitude},x=>alert(x.message))});
 
 const mapInit=async d=>{const f=d.querySelector('form'),ll=f.lat,lg=f.lng,box=d.querySelector('#mp');
 box.textContent='Memuat peta…';
@@ -136,10 +165,9 @@ d.querySelector('#me2').onclick=()=>navigator.geolocation.getCurrentPosition(p=>
 }catch(e){box.innerHTML='<p class=err>Peta error: '+String(e.message).replace(/</g,'&lt;')+'</p>'}};
 
 /* LOGIN */
-function loginUI(){view(`<div class=card style="max-width:360px;margin:10vh auto"><h2>Absensi</h2><input id=em type=email placeholder=Email><input id=pw type=password placeholder=Password><div class=row><button class=p id=li>Masuk</button><button id=su>Daftar</button></div><button id=go style="width:100%">Masuk dengan Google</button><p id=er class=err></p></div>`);
+function loginUI(){view(`<div class=card style="max-width:360px;margin:10vh auto"><h2>Absensi</h2><input id=em type=email placeholder=Email><input id=pw type=password placeholder=Password><button class=p id=li style="width:100%">Masuk</button><button id=go style="width:100%">Masuk dengan Google</button><p id=er class=err></p><small style="color:var(--m)">Belum punya akun? Minta email dan password ke admin.</small></div>`);
 const run=f=>f().catch(e=>$('#er').textContent=e.message);
 $('#li').onclick=()=>run(()=>signInWithEmailAndPassword(auth,$('#em').value,$('#pw').value));
-$('#su').onclick=()=>run(()=>createUserWithEmailAndPassword(auth,$('#em').value,$('#pw').value));
 $('#go').onclick=()=>run(()=>signInWithPopup(auth,new GoogleAuthProvider()))}
 
 onAuthStateChanged(auth,async u=>{
@@ -210,12 +238,19 @@ else await setDoc(doc(db,'attendance',open.id),{outAt:now,outPhoto:photo,outDist
 document.querySelectorAll('dialog.ab').forEach(x=>x.close());staffUI()}catch(e){st.className='err';st.textContent=e.message}};
 $('#bi').onclick=()=>dlg('in');$('#bo').onclick=()=>dlg('out')}
 
+/* AKUN LOGIN STAFF (dibuat admin lewat app sekunder agar sesi admin tidak keluar) */
+const withSec=async fn=>{const a=initializeApp(app.options,'sec'+Date.now()),sa=getAuth(a);try{return await fn(sa)}finally{try{await signOut(sa)}catch(e){}try{await deleteApp(a)}catch(e){}}};
+const mkAuth=(email,pw)=>withSec(async sa=>{try{await createUserWithEmailAndPassword(sa,email,pw);return 'new'}catch(e){if(e.code!='auth/email-already-in-use')throw e;try{await signInWithEmailAndPassword(sa,email,pw);return 'same'}catch(x){return 'exists'}}});
+const chgPass=(email,old,pw)=>withSec(async sa=>{const c=await signInWithEmailAndPassword(sa,email,old);await updatePassword(c.user,pw)});
+const delAuth=(email,pw)=>withSec(async sa=>{const c=await signInWithEmailAndPassword(sa,email,pw);await deleteUser(c.user)});
+const secErr={v:0},listSec=async()=>{try{secErr.v=0;const o={};(await list('staffSecrets')).forEach(x=>o[x.id]=x.pass||'');return o}catch(e){secErr.v=1;return null}};
+
 /* ADMIN */
-const TL={summary:'Summary',staff:'Staff',absensi:'Absensi',shifts:'Shift',locations:'Lokasi',positions:'Posisi',tasks:'Tugas',taskhist:'Riwayat Tugas',cutoffs:'Cut Off',payroll:'Payroll',paycfg:'Pengaturan Gaji'};
+const TL={summary:'Summary',staff:'Staff',absensi:'Absensi',shifts:'Shift',locations:'Lokasi',positions:'Posisi',tasks:'Tugas',taskhist:'Riwayat Tugas',cutoffs:'Cut Off',payroll:'Payroll',adjust:'Penyesuaian Gaji',paycfg:'Aturan Gaji',paycustom:'Gaji Custom',holidays:'Libur Nasional',leaves:'Hari Sakit'};
 async function adminUI(){$('#app').className='w';
-const GR=[['Ringkasan',['summary','absensi','taskhist']],['Gaji',['payroll','cutoffs']],['Data master',['staff','positions','shifts','locations','tasks','paycfg']]],
-DS={summary:'Rekap kehadiran dan tugas per staff dalam satu bulan',absensi:'Riwayat absen: tambah, edit, import, dan export',taskhist:'Tugas selesai dan belum per tanggal',payroll:'Hitung gaji per periode cut off',cutoffs:'Tanggal cut off penggajian',staff:'Data karyawan, gaji, lokasi kerja, dan shift',paycfg:'Libur nasional, libur rutin, hari sakit, dan aturan hitung gaji',positions:'Daftar jabatan',shifts:'Jam kerja tiap shift',locations:'Lokasi kerja onsite dan WFA',tasks:'Checklist harian per staff: bisa disalin atau dijadikan template'};
-view(`<div class=shell><aside class=side><div class=who><div><b>Absensi</b><small>${esc(me?.name)} · admin</small></div><button onclick="out()">Keluar</button></div><nav class=nav>${GR.map(([g,ks])=>`<div class=gl>${g}</div>`+ks.map(k=>`<button data-t=${k} class="nv${k==tab?' on':''}">${TL[k]}</button>`).join('')).join('')}</nav></aside><main><div class=pg><h2>${TL[tab]}</h2><small>${DS[tab]||''}</small></div><div id=main></div></main></div>`);
+const GR=[['Ringkasan',['summary','absensi','taskhist']],['Gaji',['payroll','adjust']],['Data',['staff','tasks']],['Pengaturan',['positions','shifts','locations','cutoffs','paycfg','paycustom','holidays','leaves']]],
+DS={summary:'Rekap kehadiran dan tugas per staff dalam satu bulan',absensi:'Riwayat absen: tambah, edit, import, dan export',taskhist:'Tugas selesai dan belum per tanggal',payroll:'Hitung gaji per periode cut off',cutoffs:'Tanggal cut off penggajian',staff:'Data karyawan, akun login, gaji, lokasi kerja, dan shift',paycfg:'Libur rutin mingguan dan aturan hitung gaji per jam, per shift, per bulan',paycustom:'Jenis gaji buatan sendiri, mis. Gaji anak store',holidays:'Tanggal merah dan libur nasional per tahun',leaves:'Hari sakit staff yang tidak dihitung tidak masuk',adjust:'Bonus dan potongan gaji per bulan payroll',positions:'Daftar jabatan',shifts:'Jam kerja tiap shift',locations:'Lokasi kerja onsite dan WFA',tasks:'Checklist harian per staff: bisa disalin atau dijadikan template'};
+view(`<div class=shell><aside class=side><div class=who><div><b>Absensi</b><small>${esc(me?.name)} · admin</small></div><button onclick="out()">Keluar</button></div><nav class=nav>${GR.map(([g,ks])=>`<div class="gl${g=='Pengaturan'?' sep':''}">${g}</div>`+ks.map(k=>`<button data-t=${k} class="nv${k==tab?' on':''}">${TL[k]}</button>`).join('')).join('')}</nav></aside><main><div class=pg><h2>${TL[tab]}</h2><small>${DS[tab]||''}</small></div><div id=main></div></main></div>`);
 document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{if(b.dataset.t=='absensi'&&tab!='absensi')AA=AB=today();tab=b.dataset.t;adminUI()});
 try{await TABS[tab]($('#main'))}catch(e){$('#main').innerHTML=`<p class=err>${esc(e.message)}</p>`}}
 
@@ -228,26 +263,47 @@ if(!tr||tr===cur||tr.parentElement!==cur.parentElement||tr.querySelector('th'))r
 const end=async()=>{if(!cur)return;cur.classList.remove('dragging');cur=null;const a=ids();if(a.join()==before)return;
 try{await Promise.all(a.map((id,i)=>setDoc(doc(db,'tasks',id),{order:i},{merge:true})))}catch(x){alert('Gagal menyimpan urutan: '+x.message);adminUI()}};
 h.onpointerup=end;h.onpointercancel=end})}
-async function manage(m,{c,t,f,rows,cols,head,id,pre,def={},stk}){
+async function manage(m,{c,t,f,rows,cols,head,id,pre,def={},stk,extra,del,delMsg}){
 m.insertAdjacentHTML('beforeend',`<div class=tb><button class=p id=ad>+ Tambah ${t}</button></div><div class="card${stk?' stk':''}">${tbl(head,rows.map(r=>[...cols(r),`<button data-e="${r.id}">Edit</button> <button data-d="${r.id}">Hapus</button>`]))}</div>`);
-const sv=async r=>{const o=await form(t,f,r||def);if(!o)return;pre&&pre(o,r);
+const sv=async r=>{const o=await form(t,f,r||def,extra?extra(r):'');if(!o)return;if(pre&&(await pre(o,r))===false)return;
 await setDoc(doc(db,c,id?id(o,r):(r?r.id:doc(collection(db,c)).id)),o,{merge:true});adminUI()};
 m.querySelector('#ad').onclick=()=>sv();
 m.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>sv(rows.find(r=>r.id==b.dataset.e)));
-m.querySelectorAll('[data-d]').forEach(b=>b.onclick=async()=>{if(confirm('Hapus data ini?')){await deleteDoc(doc(db,c,b.dataset.d));adminUI()}})}
+m.querySelectorAll('[data-d]').forEach(b=>b.onclick=async()=>{if(confirm(delMsg||'Hapus data ini?')){if(del)await del(rows.find(r=>r.id==b.dataset.d));await deleteDoc(doc(db,c,b.dataset.d));adminUI()}})}
 
 const CFG0={fixedDiv:0,offDays:['0'],prorata:'1',sickPct:0,hourRound:'0',hourMax:0,holMult:1};let PY=today().slice(0,4);
 const getCfg=async()=>{const d=await getDoc(doc(db,'settings','payroll'));return {...CFG0,...(d.exists()?d.data():{})}};
 const PPERR={v:0},listPP=async()=>{try{PPERR.v=0;return await list('payProfiles')}catch(e){PPERR.v=1;return []}};
 const MN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const PT=[['hour','Per jam'],['day','Per hari'],['shift','Per shift (total gaji bulanan ÷ jumlah hari)'],['month','Per bulan (potong prorata jika tidak masuk)'],['custom','Aturan custom (pilih aturan di bawah)']];
+const fd=d=>new Date(d+'T00:00').toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}),wd=d=>new Date(d+'T00:00').toLocaleDateString('id-ID',{weekday:'long'}),rg=r=>fd(r.from)+(r.to&&r.to!=r.from?' s/d '+fd(r.to):''),inY=r=>(r.from||'').slice(0,4)==PY;
+const yrBar=()=>`<div class=tb><label>Tahun<input type=number id=py value="${PY}" style="width:110px"></label></div>`,bindYr=()=>{$('#py').onchange=e=>{PY=e.target.value||PY;adminUI()}};
+const need=o=>{if(!o.from){alert('Tanggal wajib diisi');throw 0}if(!o.to)o.to=o.from};
 const TABS={
-async staff(m){const [rows,pos,sh,lo,co,pp]=await Promise.all([list('staff'),list('positions'),list('shifts'),list('locations'),list('cutoffs'),listPP()]);
+async staff(m){const [rows0,pos,sh,lo,co,pp,SEC]=await Promise.all([list('staff'),list('positions'),list('shifts'),list('locations'),list('cutoffs'),listPP(),listSec()]);
+const rows=rows0.map(r=>({...r,pass:SEC?SEC[r.id]||'':''}));
 const nm=(a,i)=>esc(a.find(x=>x.id==i)?.name);
-await manage(m,{c:'staff',t:'Staff',head:['Nama','No HP','Posisi','Lokasi','Shift','Gaji','Role',''],rows,
-f:[['name','Nama lengkap'],['phone','No HP','tel'],['email','Email','email'],['nik','NIK'],['gender','Jenis kelamin','select',[['','-'],['L','Laki-laki'],['P','Perempuan']]],['birthPlace','Tempat lahir'],['birthDate','Tanggal lahir','date'],['address','Alamat tempat tinggal'],['emergency','Kontak darurat (nama & no HP)'],['startDate','Mulai bekerja','date'],['role','Role','select',[['staff','Staff'],['admin','Admin']]],['position','Posisi','select',[['','-'],...pos.map(p=>[p.name,p.name])]],['locIds','Lokasi kerja (boleh lebih dari satu)','check',lo.map(l=>[l.id,l.name])],['shiftIds','Shift (boleh lebih dari satu)','check',sh.map(s=>[s.id,s.name])],['cutoffId','Cut off','select',[['','- (default tgl 25)'],...co.map(c=>[c.id,c.name])]],['payType','Tipe gaji','select',PT],['payProfileId','Aturan gaji custom (dipakai jika Tipe gaji = Aturan custom)','select',[['','-'],...pp.map(p=>[p.id,p.name])]],['rate','Gaji (Rp): per jam / per hari / TOTAL per bulan (untuk Per shift & Per bulan)','number']],
-cols:r=>[`<b>${esc(r.name)}</b><br><small>${esc(r.email)}</small>`,esc(r.phone),esc(r.position),(r.locIds||[r.locId]).map(i=>nm(lo,i)).filter(Boolean).join(', '),(r.shiftIds||[r.shiftId]).map(i=>nm(sh,i)).filter(Boolean).join(', '),r.payType=='custom'?(x=>x?`${fr(x.amount||0)}<br><small>${esc(x.name)}</small>`:'<small>Aturan custom belum dipilih</small>')(pp.find(x=>x.id==r.payProfileId)):`${fr(r.rate||0)}<br><small>${PL[r.payType||'hour']}</small>`,`<span class="bd${r.role=='admin'?' ad2':''}">${r.role}</span>`],
-id:(o,r)=>r?r.id:o.email.toLowerCase(),pre:(o,r)=>{if(!r)o.email=o.email.toLowerCase()},def:{role:'staff',payType:'hour'},stk:1})},
+if(secErr.v)m.innerHTML='<p class=err>Password staff belum bisa disimpan: tambahkan izin Firestore Rules untuk koleksi <b>staffSecrets</b> (hanya admin), lalu muat ulang.</p>';
+await manage(m,{c:'staff',t:'Staff',head:['Nama','No HP','Posisi','Lokasi','Shift','Gaji','Role','Password login',''],rows,
+f:[['name','Nama lengkap'],['email','Email (dipakai untuk login)','email'],['pass','Password login (min. 6 karakter, diberikan admin ke staff)'],['phone','No HP','tel'],['nik','NIK'],['gender','Jenis kelamin','select',[['','-'],['L','Laki-laki'],['P','Perempuan']]],['birthPlace','Tempat lahir'],['birthDate','Tanggal lahir','date'],['address','Alamat tempat tinggal'],['emergency','Kontak darurat (nama & no HP)'],['startDate','Mulai bekerja','date'],['role','Role','select',[['staff','Staff'],['admin','Admin']]],['position','Posisi','select',[['','-'],...pos.map(p=>[p.name,p.name])]],['locIds','Lokasi kerja (boleh lebih dari satu)','check',lo.map(l=>[l.id,l.name])],['shiftIds','Shift (boleh lebih dari satu)','check',sh.map(s=>[s.id,s.name])],['cutoffId','Cut off','select',[['','- (default tgl 25)'],...co.map(c=>[c.id,c.name])]],['payType','Tipe gaji','select',PT],['payProfileId','Aturan gaji custom (dipakai jika Tipe gaji = Aturan custom)','select',[['','-'],...pp.map(p=>[p.id,p.name])]],['rate','Gaji (Rp): per jam / per hari / TOTAL per bulan (untuk Per shift & Per bulan)','number']],
+cols:r=>[`<b>${esc(r.name)}</b><br><small>${esc(r.email)}</small>`,esc(r.phone),esc(r.position),(r.locIds||[r.locId]).map(i=>nm(lo,i)).filter(Boolean).join(', '),(r.shiftIds||[r.shiftId]).map(i=>nm(sh,i)).filter(Boolean).join(', '),r.payType=='custom'?(x=>x?`${fr(x.amount||0)}<br><small>${esc(x.name)}</small>`:'<small>Aturan custom belum dipilih</small>')(pp.find(x=>x.id==r.payProfileId)):`${fr(r.rate||0)}<br><small>${PL[r.payType||'hour']}</small>`,`<span class="bd${r.role=='admin'?' ad2':''}">${r.role}</span>`,r.pass?`<button class=pwv data-p="${esc(r.pass)}">Lihat</button>`:'<small>Belum tersimpan</small>'],
+extra:r=>`<p><small class=hint>${r?(r.pass?'Ganti isi kolom password untuk mengubah password login staff. Staff langsung login dengan email dan password ini, tanpa daftar.':'Password staff ini belum tersimpan. Isi dengan password yang dipakai staff sekarang, lalu Simpan: password akan dicek dan tampil di tabel. Setelah itu baru bisa diganti.'):'Staff baru langsung bisa login dengan email dan password ini, tanpa perlu daftar.'}</small></p>`+(r?`<button type=button id=rst data-em="${esc(r.email)}" style="width:100%">Kirim email reset password</button>`:''),
+id:(o,r)=>r?r.id:o.email.toLowerCase(),
+pre:async(o,r)=>{o.email=(r?r.email:o.email||'').toLowerCase().trim();const pw=(o.pass||'').trim();delete o.pass;
+if(!o.email){alert('Email wajib diisi');return false}
+if(!r){if(pw.length<6){alert('Password staff baru wajib diisi (minimal 6 karakter)');return false}
+if(SEC===null){alert('Izin Firestore untuk koleksi staffSecrets belum ada. Tambahkan dulu, lalu muat ulang.');return false}
+try{const k=await mkAuth(o.email,pw);
+if(k=='exists'&&!confirm('Email ini sudah punya akun login dengan password lain, jadi password di atas tidak bisa dipasang. Tetap simpan data staff? (staff login dengan password lamanya, atau kirim email reset dari menu Edit)'))return false;
+if(k!='exists')await setDoc(doc(db,'staffSecrets',o.email),{pass:pw})}catch(e){alert('Gagal membuat akun login: '+e.message);return false}}
+else{const old=r.pass||'';if(pw&&pw!=old){if(pw.length<6){alert('Password minimal 6 karakter');return false}
+if(SEC===null){alert('Izin Firestore untuk koleksi staffSecrets belum ada. Tambahkan dulu, lalu muat ulang.');return false}
+if(!old){try{await withSec(sa=>signInWithEmailAndPassword(sa,o.email,pw));await setDoc(doc(db,'staffSecrets',o.email),{pass:pw});alert('Password staff ini sekarang tersimpan dan tampil di tabel.');return}catch(e){alert('Password yang diisi tidak cocok dengan password login staff saat ini. Isi dengan password yang staff pakai sekarang agar bisa dicatat, atau pakai "Kirim email reset password".');return false}}
+try{await chgPass(o.email,old,pw);await setDoc(doc(db,'staffSecrets',o.email),{pass:pw})}catch(e){alert('Gagal mengganti password: '+e.message+'\nJika staff pernah mengganti password sendiri, pakai "Kirim email reset password".');return false}}}},
+del:async r=>{try{await deleteDoc(doc(db,'staffSecrets',r.id))}catch(e){}if(r.pass)try{await delAuth(r.email,r.pass)}catch(e){}},
+delMsg:'Hapus staff ini? Akun login dan passwordnya juga ikut dihapus.',
+def:{role:'staff',payType:'hour'},stk:1});
+m.querySelectorAll('.pwv').forEach(b=>b.onclick=()=>{b.textContent=b.textContent=='Lihat'?b.dataset.p:'Lihat'})},
 async absensi(m){const [st,sh,all,locs]=await Promise.all([list('staff'),list('shifts'),list('attendance'),list('locations')]);
 const td=today(),yd=fmtD(new Date(Date.now()-864e5));
 m.innerHTML=chips(st,FS,1)+`<div class="tb fl"><button id=qt class="${AA==td&&AB==td?'on':''}">Hari ini</button><button id=qy class="${AA==yd&&AB==yd?'on':''}">Kemarin</button>`+rng(AA,AB)+`</div>`;
@@ -346,9 +402,7 @@ $('#ex').onclick=()=>csv('payroll-'+PM,['Nama','Tipe','Cut off','Periode','Jam',
 m.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{const o=await form('Penyesuaian payroll',[['amt','Bonus (+) / potongan (-) Rp','number'],['note','Catatan']]);
 if(o){await setDoc(doc(collection(db,'adjItems')),{...o,period:PM,email:b.dataset.a});adminUI()}})},
 
-async paycfg(m){PM=PM||today().slice(0,7);const cfg=await getCfg(),Y=PY;
-const [st,hol,lv,its]=await Promise.all([list('staff'),list('holidays'),list('leaves'),list('adjItems',where('period','==',PM))]);
-const nm=e=>esc(st.find(s=>s.email==e)?.name||e),se=st.map(s=>[s.email,s.name]),inY=r=>(r.from||'').slice(0,4)==Y,fd=d=>new Date(d+'T00:00').toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}),wd=d=>new Date(d+'T00:00').toLocaleDateString('id-ID',{weekday:'long'}),rg=r=>fd(r.from)+(r.to&&r.to!=r.from?' s/d '+fd(r.to):'');
+async paycfg(m){const cfg=await getCfg(),Y=PY;
 const sf=[['offDays','Libur rutin mingguan (tidak dihitung tidak masuk)','check',DAYN],
 ['fixedDiv','Per bulan & per shift: pembagi hari (0 = otomatis sesuai jumlah hari periode, mis. 30)','number'],
 ['prorata','Per bulan: potong jika tidak masuk (prorata)','select',[['1','Ya'],['0','Tidak']]],
@@ -364,32 +418,36 @@ ${kv('Libur rutin mingguan',cfg.offDays.length?dayLbl(cfg.offDays):'Tidak ada')}
 ${kv('Per bulan',`Pembagi ${+cfg.fixedDiv||'otomatis (jumlah hari periode)'} · potong tidak masuk: ${cfg.prorata=='1'?'Ya':'Tidak'} · hari sakit dipotong ${+cfg.sickPct||0}%`)}
 ${kv('Per jam',`Pembulatan: ${+cfg.hourRound?cfg.hourRound+' menit':'tanpa'} · batas jam per absen: ${+cfg.hourMax||'tanpa batas'} · pengali hari libur: ×${+cfg.holMult||1}`)}
 ${kv('Per shift','Total gaji bulanan ÷ pembagi × jumlah shift masuk')}
-<p><button id=cf class=p>Ubah aturan</button></p></div>
-<div id=h5></div>
-<div class=tb><label>Tahun<input type=number id=py value="${Y}" style="width:110px"></label></div>
-<div id=h1></div><details class=card id=h4 style="padding:14px"><summary><b>Tanggal libur rutin ${Y}</b> (${offs.length} hari, otomatis)</summary>${tbl(['Bulan','Tanggal'],byM)}</details><div id=h2></div><div id=h3></div>`;
-$('#py').onchange=e=>{PY=e.target.value||PY;adminUI()};
-$('#cf').onclick=async()=>{const o=await form('Aturan gaji',sf,cfg);if(o){await setDoc(doc(db,'settings','payroll'),o);adminUI()}};
-$('#h5').innerHTML='<h3>Aturan gaji custom</h3><small>Buat jenis gaji sendiri (mis. Gaji anak store), lalu pilih di data Staff dengan Tipe gaji = Aturan custom. Gaji per jam = gaji bulanan ÷ pembagi hari ÷ jam kerja per hari, dikali total jam masuk.</small>';
-const pp=await listPP(),DL={period:'hari periode cut off',month:'hari bulan kalender'};
-if(PPERR.v)$('#h5').insertAdjacentHTML('beforeend','<p class=err>Aturan gaji custom belum bisa diakses: tambahkan izin Firestore Rules untuk koleksi <b>payProfiles</b> (samakan dengan aturan koleksi holidays), lalu muat ulang.</p>');
-await manage($('#h5'),{c:'payProfiles',t:'Aturan Gaji',head:['Nama','Gaji per bulan','Rumus',''],rows:pp,
+<p><button id=cf class=p>Ubah aturan</button></p></div>`+yrBar()+`<details class=card id=h4 style="padding:14px"><summary><b>Tanggal libur rutin ${Y}</b> (${offs.length} hari, otomatis)</summary>${tbl(['Bulan','Tanggal'],byM)}</details>`;
+bindYr();
+$('#cf').onclick=async()=>{const o=await form('Aturan gaji',sf,cfg);if(o){await setDoc(doc(db,'settings','payroll'),o);adminUI()}}},
+
+async paycustom(m){const pp=await listPP(),DL={period:'hari periode cut off',month:'hari bulan kalender'};
+m.innerHTML='<small class=hint>Buat jenis gaji sendiri (mis. Gaji anak store), lalu pilih di data Staff dengan Tipe gaji = Aturan custom. Gaji per jam = gaji bulanan ÷ pembagi hari ÷ jam kerja per hari, dikali total jam masuk.</small>';
+if(PPERR.v)m.insertAdjacentHTML('beforeend','<p class=err>Aturan gaji custom belum bisa diakses: tambahkan izin Firestore Rules untuk koleksi <b>payProfiles</b> (samakan dengan aturan koleksi holidays), lalu muat ulang.</p>');
+await manage(m,{c:'payProfiles',t:'Aturan Gaji',head:['Nama','Gaji per bulan','Rumus',''],rows:pp,
 f:[['name','Nama aturan gaji (mis. Gaji anak store)'],['amount','Gaji per bulan (Rp)','number'],['divMode','Pembagi hari','select',[['period','Jumlah hari periode cut off (28/29/30/31)'],['month','Jumlah hari bulan kalender payroll'],['fixed','Angka tetap']]],['divFixed','Angka pembagi tetap (hanya dipakai jika Pembagi = Angka tetap)','number'],['hoursPerDay','Jam kerja per hari','number'],['subOff','Kurangi hari libur dari pembagi','select',[['0','Tidak (tanpa hari libur)'],['1','Ya (libur rutin dan libur nasional)']]],['hourRound','Pembulatan jam kerja ke bawah','select',[['0','Tanpa pembulatan'],['15','15 menit'],['30','30 menit'],['60','1 jam']]],['hourMax','Batas jam dibayar per absen (0 = tanpa batas)','number']],
 cols:r=>[esc(r.name),fr(r.amount||0),`${fr(r.amount||0)} ÷ ${r.divMode=='fixed'?(+r.divFixed||'?'):DL[r.divMode||'period']}${r.subOff=='1'?' (dikurangi libur)':''} ÷ ${+r.hoursPerDay||1} jam × jam masuk`],
-def:{amount:0,divMode:'period',divFixed:0,hoursPerDay:8,subOff:'0',hourRound:'0',hourMax:0}});
-const need=o=>{if(!o.from){alert('Tanggal wajib diisi');throw 0}if(!o.to)o.to=o.from};
-$('#h1').innerHTML=`<h3>Libur nasional / tanggal merah ${Y}</h3>`;
-await manage($('#h1'),{c:'holidays',t:'Libur',head:['Tanggal','Hari','Keterangan',''],rows:hol.filter(inY).sort((a,b)=>a.from.localeCompare(b.from)),f:[['from','Dari tanggal','date'],['to','Sampai tanggal (kosong = 1 hari)','date'],['name','Keterangan (mis. Idul Fitri)']],cols:r=>[rg(r),wd(r.from),esc(r.name)],pre:need,def:{from:Y+'-01-01'}});
-$('#h1 #ad').insertAdjacentHTML('afterend','<button id=bk>Tambah banyak</button>');
+def:{amount:0,divMode:'period',divFixed:0,hoursPerDay:8,subOff:'0',hourRound:'0',hourMax:0}})},
+
+async holidays(m){const hol=await list('holidays'),Y=PY;m.innerHTML=yrBar();bindYr();
+await manage(m,{c:'holidays',t:'Libur',head:['Tanggal','Hari','Keterangan',''],rows:hol.filter(inY).sort((a,b)=>a.from.localeCompare(b.from)),f:[['from','Dari tanggal','date'],['to','Sampai tanggal (kosong = 1 hari)','date'],['name','Keterangan (mis. Idul Fitri)']],cols:r=>[rg(r),wd(r.from),esc(r.name)],pre:need,def:{from:Y+'-01-01'}});
+$('#ad').insertAdjacentHTML('afterend','<button id=bk>Tambah banyak</button>');
 $('#bk').onclick=()=>{const d=document.createElement('dialog');d.innerHTML=`<h3>Tambah banyak libur nasional</h3><p><small>Satu baris satu libur. Format: tanggal nama, atau tanggal s/d tanggal nama. Contoh:<br>${Y}-01-01 Tahun Baru<br>${Y}-03-20 s/d ${Y}-03-24 Idul Fitri</small></p><textarea id=ta rows=10 style="width:100%;border:1px solid var(--b);border-radius:12px;padding:10px;font:inherit"></textarea><div class=row><button id=cx>Batal</button><button id=ok class=p>Simpan</button></div>`;
 document.body.append(d);d.showModal();d.onclose=()=>d.remove();d.querySelector('#cx').onclick=()=>d.close();
 d.querySelector('#ok').onclick=async()=>{const bad=[],good=[];d.querySelector('#ta').value.split('\n').map(x=>x.trim()).filter(Boolean).forEach(l=>{const q=l.match(/^(\d{4}-\d{2}-\d{2})(?:\s*(?:s\/d|sd|-)\s*(\d{4}-\d{2}-\d{2}))?\s*(.*)$/);if(!q)return bad.push(l);good.push({from:q[1],to:q[2]||q[1],name:q[3]})});
 if(bad.length)return alert('Baris tidak terbaca:\n'+bad.slice(0,6).join('\n'));if(!good.length)return;
 const ex=new Set(hol.map(h=>h.from)),add=good.filter(g=>!ex.has(g.from));
-try{await Promise.all(add.map(g=>setDoc(doc(collection(db,'holidays')),g)));alert(add.length+' libur ditambahkan'+(good.length>add.length?`, ${good.length-add.length} dilewati (tanggal sudah ada)`:''));d.close();adminUI()}catch(er){alert(er.message)}}};
-$('#h2').innerHTML=`<h3>Penyesuaian hari sakit ${Y}</h3><small>Hari sakit tidak dihitung tidak masuk. Potongannya mengikuti aturan di atas (${+cfg.sickPct||0}% gaji harian).</small>`;
-await manage($('#h2'),{c:'leaves',t:'Sakit',head:['Staff','Tanggal','Catatan',''],rows:lv.filter(inY).sort((a,b)=>b.from.localeCompare(a.from)),f:[['email','Staff','select',se],['from','Dari tanggal','date'],['to','Sampai tanggal (kosong = 1 hari)','date'],['note','Catatan']],cols:r=>[nm(r.email),rg(r),esc(r.note)],pre:need,def:{from:today()}});
-$('#h3').innerHTML=`<h3>Penyesuaian gaji (bonus / potongan)</h3><label>Bulan payroll<input type=month id=pm2 value="${PM}"></label>`;$('#pm2').onchange=x=>{PM=x.target.value;adminUI()};
-await manage($('#h3'),{c:'adjItems',t:'Penyesuaian',head:['Staff','Catatan','Jumlah',''],rows:its,f:[['email','Staff','select',se],['amt','Bonus (+) / potongan (-) Rp','number'],['note','Catatan']],cols:r=>[nm(r.email),esc(r.note),fr(r.amt||0)],pre:(o,r)=>{if(!r)o.period=PM}})}
+try{await Promise.all(add.map(g=>setDoc(doc(collection(db,'holidays')),g)));alert(add.length+' libur ditambahkan'+(good.length>add.length?`, ${good.length-add.length} dilewati (tanggal sudah ada)`:''));d.close();adminUI()}catch(er){alert(er.message)}}}},
+
+async leaves(m){const [st,lv,cfg]=await Promise.all([list('staff'),list('leaves'),getCfg()]);
+const se=st.map(s=>[s.email,s.name]),nm=e=>esc(st.find(s=>s.email==e)?.name||e);
+m.innerHTML=yrBar()+`<small class=hint>Hari sakit tidak dihitung tidak masuk. Potongannya mengikuti Aturan Gaji (${+cfg.sickPct||0}% gaji harian).</small>`;bindYr();
+await manage(m,{c:'leaves',t:'Sakit',head:['Staff','Tanggal','Catatan',''],rows:lv.filter(inY).sort((a,b)=>b.from.localeCompare(a.from)),f:[['email','Staff','select',se],['from','Dari tanggal','date'],['to','Sampai tanggal (kosong = 1 hari)','date'],['note','Catatan']],cols:r=>[nm(r.email),rg(r),esc(r.note)],pre:need,def:{from:today()}})},
+
+async adjust(m){PM=PM||today().slice(0,7);const [st,its]=await Promise.all([list('staff'),list('adjItems',where('period','==',PM))]);
+const se=st.map(s=>[s.email,s.name]),nm=e=>esc(st.find(s=>s.email==e)?.name||e);
+m.innerHTML=`<div class=tb><label>Bulan payroll<input type=month id=pm2 value="${PM}"></label></div>`;$('#pm2').onchange=x=>{PM=x.target.value;adminUI()};
+await manage(m,{c:'adjItems',t:'Penyesuaian',head:['Staff','Catatan','Jumlah',''],rows:its,f:[['email','Staff','select',se],['amt','Bonus (+) / potongan (-) Rp','number'],['note','Catatan']],cols:r=>[nm(r.email),esc(r.note),fr(r.amt||0)],pre:(o,r)=>{if(!r)o.period=PM}})}
 };
 </script></body></html>
